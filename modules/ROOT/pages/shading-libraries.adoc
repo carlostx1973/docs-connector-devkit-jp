@@ -1,0 +1,83 @@
+= ライブラリのシェーディング
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, シェーディング, ライブラリ, jar, プラグイン, アーティファクト, シェード, Maven, クラスパス, コリジョン, 競合
+
+DevKit バージョン 3.5.3 以降では、&#8203;http://maven.apache.org/plugins/maven-shade-plugin/examples/includes-excludes.html[Apache Maven Shade プラグイン]を使用した「シェーディング」された .jar ファイル (つまり、その連動関係ライブラリのクラスおよびパッケージに加え、場合によってはさまざまなパッケージおよびクラスの再配置も含まれる「スーパー」な .jar) の作成をサポートしています。
+
+Maven Shade プラグインを使用すれば、すべてのライブラリクラスの連動関係がバンドルされたカスタムコネクタライブラリ .jar を構築できます。これにより、実行時にそのライブラリクラスの連動関係と Mule 内ですでに使用されている他のバージョンのライブラリの間でコリジョン/競合が発生しないようにできます。
+
+== 使用する前に
+
+Maven Shade プラグインの使用を開始する前に、まずシェーディングに代わる方法として次のいずれかを検討することをお勧めします。
+
+* Mule が使用しているのと同じバージョンのライブラリを使用する
+* Mule が使用しているものと競合しないパッケージとクラスが含まれるまったく異なるライブラリを使用する
+
+上記 2 つの代替の方法がいずれもカスタムコネクタに適していない場合は、Maven Shade プラグインを使用するしかない場合があります。
+
+== Shade プラグインの実行内容
+
+Maven Shade プラグインは競合するクラスのパッケージの名前を変更します。また、代わりにシェーディングされたパッケージで再配置されたクラスを使用するためにコール元クラスのバイトコードも変更します。  これらを実行することで、Maven Shade プラグインはコネクタに必要なクラス (Mule が使用している同じクラスの別のバージョンと競合していた) が同じ JVM クラスパスで問題なく共存できるようにします。これにより、実行時にクラスおよびメソッドで「Not Found (見つかりませんでした)」というエラーが表示されるのを防ぎます。
+
+== Shade プラグインの使用方法
+
+* Mule が使用するクラスと競合するクラスが含まれる 1 つ以上のライブラリの .jar に推移的な連動関係がある連動関係 .jar について、連動関係エントリをカスタムコネクタの `pom.xml` ファイルに追加します。
+* Shade プラグインをカスタムコネクタプロジェクトの `pom.xml` ファイルの構築プラグインセクションに追加します。
+* (省略可能) 「mule-devkit-maven-plugin」の明示的な設定を追加して、Anypoint Studio にインストールするためにシェーディングされたコネクタ jar が 適切に構築されるようにします。
+
+次の設定例は、Apache Commons Compress ライブラリの競合に対処するためのものです。
+
+[source,xml,linenums]
+----
+<dependencies>
+   <dependency>
+       <groupId>org.apache.commons</groupId>
+       <artifactId>commons-compress</artifactId>
+       <version>1.8.1</version>
+   </dependency>
+</dependencies>
+----
+
+
+[source,xml,linenums]
+----
+<build>
+ <plugins>
+   <plugin>
+     <groupId>org.apache.maven.plugins</groupId>
+     <artifactId>maven-shade-plugin</artifactId>
+     <version>3.0.0</version>
+     <configuration>
+       <!-- Custom shade configuration -->
+       <artifactSet>
+         <includes>
+            <include>org.apache.commons:commons-compress</include> <!-- the.group.id:the-artifact-id -->
+         </includes>
+       </artifactSet>
+       <relocations>
+         <relocation>
+            <pattern>org.apache.commons.compress</pattern> <-- original.package.name -->
+            <shadedPattern>com.mycompany.shaded.org.apache.commons.compress</shadedPattern> <!-- new.shaded.package.name -->
+         </relocation>
+       </relocations>
+      </configuration>
+   </plugin>
+
+   <plugin> <!-- Use this explicit plugin configuration to properly install a shaded custom connector in Anypoint Studio -->
+     <groupId>org.mule.tools.devkit</groupId>
+     <artifactId>mule-devkit-maven-plugin</artifactId>
+     <version>${mule.devkit.version}</version>
+     <extensions>true</extensions>
+     <configuration>
+       <attachShadedJar>true</attachShadedJar>
+       <attachConnectorLibs>false</attachConnectorLibs>
+       <skipStudioPluginPackage>${devkit.studio.package.skip}</skipStudioPluginPackage>
+     </configuration>
+   </plugin>
+
+   <!-- Other plugins -->
+ </plugins>
+</build>
+----

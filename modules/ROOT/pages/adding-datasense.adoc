@@ -1,0 +1,511 @@
+= DataSense の追加
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, DataSense, コネクタ, メタデータ, アノテーション, pojo
+
+Mule DataSense には、サービスのエンティティのメタデータが表示されます。この機能は省略可能ですが、ユーザの実装を容易にするためにコネクタで DataSense を使用することを強くお勧めします。
+
+image::devkit-steps-operations.png[]
+
+== 前提条件
+
+このドキュメントは、読者が xref:index.adoc[Anypoint コネクタ DevKit] によって提供されるコネクタアーキテクチャ、およびエンドユーザの観点からの xref:5@studio::datasense.adoc[DataSense] に精通していることを前提としています。
+
+== DataSense を使用したコネクタ
+
+インテグレーション開発者は多くの場合、Web サービスに渡したり Web サービスから返されたりするパラメータとデータ型を判断するためだけに多くの時間を費やします。これらのパラメータを確認するために各 API のドキュメントを調べる必要があるのは、効率が悪く、当てにならず、ストレスが溜まりがちです。DataSense を使用すれば、この情報は設計時に Anypoint Studio 内ですぐに確認できます。
+
+DataSense はエンティティとその内部構造を Studio に提供し、Studio はコネクタを使用しているユーザにこの情報を表示します。DataSense は他の Anypoint Studio 機能と連携して次の処理も行います。
+
+* コネクタのメタデータにアクセスし、コンテキストが適切な場合に、Studio がコネクタから返される項目内の期待値をインテリジェントに提案できるようにする。
+* DataWeave の機能を使用して、マッピング内の入力データまたは出力データを自動的に推測する (DataSense 対応のコネクタと組み合わせて使用した場合)。
+
+[NOTE]
+*DataSense の基本的な利点*​は、コネクタを介してアプリケーションによって公開されるデータモデルからメタデータを抽出できることです。xref:5@studio::datasense.adoc[DataSense] についての詳細を確認してください。
+
+DataSense を実装する 2 つの重要なステップは、次のとおりです。
+
+. *メタデータ取得の設定* – サービスからメタデータを取得し、この情報を提供するためのコネクタの実装を提供します。
+. *メタデータ認識の設定* – Anypoint Studio が DataSense 実装を認識し、それに関する情報をコネクタのエンドユーザに提供するように、操作にアノテーションを付加する方法を定義します。
+
+
+== 静的データモデル
+
+コネクタは、そのエンティティを *POJO* として公開するときに、*静的データモデル* (「強く型付けされた」データモデルとも呼ばれる) があるとみなされます。たとえば、特定のクラスのセットで SDK を使用する場合、これらが解決されてコンパイル時に認識されます。
+
+この場合、メタデータ取得は簡単です。POJO エンティティクラス定義を参照し、イントロスペクションを使用して利用可能な Java で必要なすべてのメタデータを取得できます。認識は、プロセッサ内の強く型付けされたパラメータによってすでに暗示されています。
+
+[NOTE]
+実例は、GitHub の https://github.com/mulesoft/twitter-connector/tree/develop[Twitter コネクタ]を確認してください。
+
+=== 静的メタデータ取得
+
+静的メタデータを取得するには、コネクタから取得します。変更される可能性は低いため、Web サービスをコールして収集する必要はありません。代わりに、*コネクタに情報をハードコード*​できます。
+
+.  コネクタクラス内で、`@MetaDataKeyRetriever` のアノテーションを付加した新しいメソッドを追加します。
++
+[source,java,linenums]
+----
+@MetaDataKeyRetriever
+    public List<MetaDataKey> getEntities() throws Exception {
+        List<MetaDataKey> entities = new ArrayList<MetaDataKey>();
+        entities.add(new DefaultMetaDataKey("Book_id","Book"));
+        entities.add(new DefaultMetaDataKey("Author_id","Author"));
+        entities.add(new DefaultMetaDataKey("BookList_id","BookList"));
+        return entities;
+    }
+----
++
+このメソッドは、エンティティの名前のリストを返します。この場合、Book、Author、BookList の 3 つのキーを含むリストを取得します。
+. `@MetaDataRetriever` メソッドを実装し、前の `@MetaDataKeyRetriever` メソッドによって返された各エンティティの記述を取得します。
++
+[NOTE]
+`@MetaDataRetriever` のアノテーションが付加された Java メソッドの戻り値のデータ型は `MetaData`  _である必要があり_ 、1 つの `MetaDataKey` パラメータを _受け取る必要があります_ 。
++
+この例では、サービスのエンティティクラスがローカルに存在することを前提としています。`Book.class` および `Author.class` は、コード内で直接参照できます。DevKit によって提供されるインターフェース `DefaultMetaDataBuilder` をコールして、簡単に POJO を作成できます。
++
+[source,java,linenums]
+----
+@MetaDataRetriever
+public MetaData describeEntity(MetaDataKey entityKey) throws Exception {
+    //Here we describe the entity depending on the entity key
+    if ("Author_id".equals(entityKey.getId())) {
+        MetaDataModel authorModel =  new DefaultMetaDataBuilder().createPojo(Author.class).build();
+        return new DefaultMetaData(authorModel);
+    }
+    if ("Book_id".equals(entityKey.getId())) {
+        MetaDataModel bookModel =  new DefaultMetaDataBuilder().createPojo(Book.class).build();
+        return new DefaultMetaData(bookModel);
+    }
+    if ("BookList_id".equals(entityKey.getId())) {
+        MetaDataModel bookListModel =  new DefaultMetaDataBuilder().createList().ofPojo(Book.class).build();
+        return new DefaultMetaData(bookListModel);
+    }
+    throw new RuntimeException(String.format("This entity %s is not supported",entityKey.getId()));
+}
+----
++
+このメソッドは、Book、BookList、および Author とそれらによって公開されるすべての公開項目を自動的に記述します。
+
+[NOTE]
+====
+外部サービスからメタデータを取得するには、*2 つの異なる操作*​の使用が理想的です。
+
+エンティティの取得に 1 つ、記述の取得に 1 つの、2 つの異なる操作を使用する理由は、*1 つのメソッドですべてのエンティティを記述すると、過剰な数の API コールが発生する可能性があるためです* (おそらくエンティティごとに 1 つの API コールが必要になります)。
+====
+
+=== 静的メタデータ認識
+
+ここまでで、接続を目的とするサービス内のすべてのエンティティの記述メカニズムを実装しました。次に、この情報をメッセージプロセッサからアクセスできるようにします。
+
+このメソッドは、`@MetaDataKeyParam` のアノテーションが付加されたパラメータとして操作のデータ型を受け取ります。`@Default("#[payload]")` としてアノテーションが付加されたパラメータで `@MetaDataRetriever` によって返されたエンティティデータも取得します。
+
+[NOTE]
+このメソッドによって期待されるデータ型と生成されるデータ型は、メタデータが​ _静的_ ​か​_動的_​かによって異なります。メタデータが​_静的_​の場合、エンティティデータは `Object` です。
+
+[source,java,linenums]
+----
+@Processor
+public Object create(@MetaDataKeyParam(affects = MetaDataKeyParamAffectsType.BOTH) String entityType, @Default("#[payload]") Object entityData) {
+    if (entityData instanceof Book) {
+        return createBook((Book) entityData));
+    }
+    if (entityData instanceof Author) {
+        return createAuthor((Author) entityData));
+    }
+    throw new RuntimeException("Entity not recognized");
+}
+private Object createAuthor(Author entityData) {
+    //CODE FOR CREATING NEW AUTHOR GOES HERE
+    return null;
+}
+private Object createBook(Book entityData) {
+    //CODE FOR CREATING A NEW BOOK GOES HERE
+    return null;
+}
+----
+
+[source,java,linenums]
+----
+@Processor
+public Object create(@MetaDataKeyParam String entityType, @Default("#[payload]") Object entityData) {
+    }
+----
+
+出力メタデータは、Studio で選択されたエンティティ種別に応じて変わります。これは、DataMapper または DataWeave (Transform Message コンポーネント) と組み合わせて使用した場合に特に役立ちます。このメソッドにより、`@MetaDataRetriever` によって返されるすべてのエンティティが Studio のドロップダウンに表示されます。
+
+image::dsimage.png[DSimage]
+
+また、エンティティに関するメタデータは、DataMapper または DataWeave (Transform Message コンポーネント) などの他の Mule 要素に渡すことができます。
+
+image::image2.png[]
+
+=== 静的メタデータの使用例
+
+次のセクションでは、静的データモデルを使用して Web サービスからデータを取得するコネクタの作成方法を示します。
+
+[NOTE]
+この静的メタデータコネクタの完全な実例は、 https://github.com/mulesoft-labs/example-connector/tree/master/static-metadata-example[GitHub] からダウンロードしてください。
+
+この例では、コネクタはライブラリ Web サービスに接続します。この Web サービスには、*book* と *author* の 2 種類の要素があります。
+
+*book* 要素には次の項目があります。
+
+* title
+* synopsis
+* author
+
+*author* 要素には次の項目があります。
+
+* firstName
+* lastName
+
+== 動的データモデル
+
+コネクタに動的データモデル (「弱く型付けされた」データモデルとも呼ばれる) がある場合、特定のメタデータ型はすぐには使用可能になりません。特定の `MetaDataKey` は、静的データモデルのようにコンパイル時ではなく、設計時または実行時に解決されるメタデータを表します。動的データモデルがあるコネクタの DataSense 機能をサポートするには、アプリケーションから提供されたデータに基づいてメタデータを作成する追加機能を実装する必要があります。
+
+=== 動的メタデータ取得
+
+動的メタデータ取得では、コネクタによって参照される `@MetaDataCategory` の動的スキーマの DataSense メタデータを生成する、2 つのアノテーションが付加されたメタデータ関連メソッドを含める必要があります。
+
+* `@MetaDataKeyRetriever` は、接続されたサービスからすべてのエンティティ種別名のリストを取得する。
++
+[source,java,linenums]
+----
+@MetaDataKeyRetriever
+public List<MetaDataKey> getMetadataKeys() {  }
+----
++
+* `@MetaDataRetriever` は、メタデータのリスト (`@MetaDataKeyRetriever` によって取得) を使用して、各エンティティ種別のエンティティ構成を取得する。
++
+[source,java,linenums]
+----
+@MetaDataRetriever
+public MetaData getMetadata(MetaDataKey key) {  }
+----
+
+=== 動的メタデータ認識
+
+このステップでは、キャプチャしたメタデータをメッセージプロセッサからアクセスできるようにします。実装すると、Studio でのコネクタのプロパティエディタのドロップダウンには、`@MetaDataKeyRetriever` によって返されたすべてのエンティティが表示され、各エンティティは `@MetaDataRetriever` によって返されたプロパティが結合されます。
+
+image::dsimage.png[DSimage]
+
+これを実現するには、エンティティ種別を `@MetaDataKeyParam` のアノテーションが付加されたパラメータとして受け取るメソッドをメッセージプロセッサに含める必要があります。このメソッドは、`@Payload` または `@Default ("#[payload]")` としてアノテーションが付加されたパラメータで (`@MetaDataRetriever` によって返された) エンティティデータを受け取る必要もあります。
+
+メタデータが​_動的_​の場合、エンティティデータは `Map<String,Object>` です。
+
+[source,java,linenums]
+----
+public Map<String,Object> create(@MetaDataKeyParam String entityType, @Default("#[payload]") Map<String,Object> entityData) {
+    }
+----
+
+メタデータが​*動的オブジェクト*​の​*リスト*​の場合、エンティティデータは `List<Map<String,Object>>` です。
+
+[source,java,linenums]
+----
+public List<Map<String,Object>> getList(@MetaDataKeyParam String entityType, @Default("#[payload]") List<Map<String,Object>> entityData) {
+    }
+----
+
+=== 動的メタデータの使用例
+
+次のセクションでは、動的データモデルを使用して Web サービスからデータを取得するコネクタの作成方法を示します。メタデータを実装する最も実用的な方法は、常に動的に実装することです。こうすることで、接続するサービス内のエンティティの属性が経時的に変更される場合、コネクタはその変更に容易に適応します。
+
+[NOTE]
+この動的メタデータコネクタの完全な実例は、 https://github.com/mulesoft-labs/example-connector/tree/master/dynamic-metadata-example[GitHub] からダウンロードしてください。
+
+この例では、<<Example Using Static Metadata,静的モデルの例>>と同様に、コネクタが接続する Web サービスは book データベースです。books と authors の 2 種類の要素があり、その両方に前の例と同じ項目があります。
+
+== コネクタの動的データモデルへの DataShhense サポートの追加
+
+コネクタに DataSense を実装するには、最初に `@MetaDataCategory` を作成し、`@MetaDataScope` を使用してコネクタにバインドします。上記の動的データモデルセクションで繰り返されるこのウォークスルーに従ってください。
+
+=== @MetaDataCategory および @MetaDataScope
+
+DataSense リゾルバをグループ化するため、DevKit には Java クラスに適用できるアノテーション `@MetaDataCategory` が用意されています。この Java クラス内で、メタデータ取得メカニズム (`@MetaDataScope` として `@MetaDataKeyRetriever` および `@MetaDataRetriever` のアノテーションが付加されたメソッド) を定義します。.
+
+たとえば、著者が書いた本を表す「books」という名前の Author エンティティのシークレット項目へのアクセス権を付与する追加の特別なメッセージプロセッサと共に、通常のメッセージプロセッサを提供するとします。メタデータカテゴリを使用して、複数の異なるメッセージプロセッサを 1 つのコネクタにまとめ、それぞれに異なるエンティティグループを表示できます。
+
+下の例は、`@MetaDataKeyRetriever` と `@MetaDataRetriever` の両方を含み、個別の Java ファイルに存在する `@MetaDataCategory` クラスを表示します。その後、アノテーションが付加されたメソッドを詳しく調べます。このクラスとコネクタモジュールの間にリンクを確立できます。これを行う最も一般的な方法は、次に示すように `@Inject` を使用してコネクタクラスを `@MetaDataCategory` クラスに挿入することです。
+
+. `@MetaDataCategory` クラスを作成します。
++
+[source,java,linenums]
+----
+import org.mule.common.metadata.*;
+import org.mule.common.metadata.builder.DefaultMetaDataBuilder;
+import org.mule.common.metadata.builder.DynamicObjectBuilder;
+import org.mule.common.metadata.datatype.DataType;
+
+import org.mule.api.annotations.components.MetaDataCategory;
+import org.mule.api.annotations.MetaDataKeyRetriever;
+import org.mule.api.annotations.MetaDataRetriever;
+
+@MetaDataCategory
+public class DefaultCategory {
+
+    @Inject
+    private MyConnector myconnector;
+
+    @MetaDataKeyRetriever
+    public List<MetaDataKey> getEntities() throws Exception {
+        //Here we generate the keys
+    }
+
+    @MetaDataRetriever
+    public MetaData describeEntity(MetaDataKey entityKey) throws Exception {
+        //Here we describe the entity depending on the entity key
+    }
+}
+----
++
+. インポートを確認します。
++
+* `org.mule.common.metadata.*` クラスには、メタデータの表現と管理を行う Mule クラスが含まれる。
+* `org.mule.common.metadata.builder` クラスは、メタデータ表現 (非常に複雑になる可能性があるオブジェクトのセット) を作成する。
+* `org.mule.common.metadata.datatype.DataType` クラスは、異なるオブジェクト項目のデータ型とそのプロパティを表す。
++
+. `@MetaDataScope` を使用して、このカテゴリを `@Connector` または `@Processor` にバインドします。
++
+[source,java,linenums]
+----
+/**
+ * DataSense-enabled Connector with multiple categories
+ *
+ * @author MuleSoft, inc.
+ */
+@MetaDataScope(DefaultCategory.class)
+@Connector(name = "my-connector", minMuleVersion = "3.6")
+public class MyConnector {
+...
+
+  @MetaDataScope(AdvancedCategory.class)
+    @Processor
+    public Map<String,Object> advancedOperation(@MetaDataKeyParam String entityType, @Default("#[payload]") Map<String,Object> entityData) {
+       //Here you can use the books field in authors//
+    }
+}
+----
+
+=== 動的メタデータ取得の実装
+
+型構造を持つ POJO に直接アクセスすることはできないため、Web サービス自体からこの構造を取得する必要があります。`Map<String,Object>` を使用して、動的エンティティを表します。
+
+[NOTE]
+API コールを介してメタデータを動的に取得する場合、`@Connect` メソッドは `@MetaDataKeyRetriever` メソッドの前に実行されます。これは、エンドユーザがメタデータへのアクセス権を取得する前に、接続の問題の解決が必要なことを意味します。
+
+. コネクタクラス内で、`@MetaDataKeyRetriever` のアノテーションが付加された新しいメソッドを追加します。(このメソッドは、静的メタデータを使用した実装と同じです。)
++
+[source,java,linenums]
+----
+@MetaDataKeyRetriever
+    public List<MetaDataKey> getEntities() throws Exception {
+        List<MetaDataKey> entities = new ArrayList<MetaDataKey>();
+        entities.add(new DefaultMetaDataKey("Book_id","Book"));
+        entities.add(new DefaultMetaDataKey("Author_id","Author"));
+        entities.add(new DefaultMetaDataKey("BookList_id","BookList"));
+        return entities;
+    }
+----
++
+. `@MetaDataRetriever` メソッドを実装します。これは、前のメソッドによって返された各エンティティの記述を取得します。前の例と同様、このメソッドはインターフェース `DefaultMetaDataBuilder` を使用しますが、今回は POJO の代わりに動的オブジェクトを作成するためにコールされます。
++
+[source,java,linenums]
+----
+@MetaDataRetriever
+public MetaData describeEntity(MetaDataKey entityKey) throws Exception {
+    //Here we describe the entity depending on the entity key
+    if ("Author_id".equals(entityKey.getId())) {
+        MetaDataModel authorModel =  new DefaultMetaDataBuilder().createDynamicObject("Author")
+                .addSimpleField("firstName", DataType.STRING)
+                .addSimpleField("lastName", DataType.STRING)
+                .build();
+        return new DefaultMetaData(authorModel);
+    }
+    if ("Book_id".equals(entityKey.getId())) {
+        MetaDataModel bookModel =  new   DefaultMetaDataBuilder().createDynamicObject("Book")
+                .addSimpleField("title",DataType.STRING)
+                .addSimpleField("synopsis",DataType.STRING)
+                .addDynamicObjectField("author")
+                .addSimpleField("firstName",DataType.STRING)
+                .addSimpleField("lastName",DataType.STRING)
+                .endDynamicObject()
+                .build();
+        return new DefaultMetaData(bookModel);
+    }
+    if ("BookList_id".equals(entityKey.getId())) {
+        MetaDataModel bookListModel =  new DefaultMetaDataBuilder().createList().ofDynamicObject("book").build();
+        return new DefaultMetaData(bookListModel);
+    }
+    throw new RuntimeException(String.format("This entity %s is not supported",entityKey.getId()));
+}
+----
+
+=== 動的メタデータ認識の実装
+
+ここまでで、接続を目的とするサービス内のすべてのエンティティの記述メカニズムを実装しました。次に、この情報をメッセージプロセッサからアクセスできるようにする必要があります。
+
+メッセージプロセッサは、`@MetaDataKeyParam` のアノテーションが付加されたパラメータとして操作のデータ型を受け取る必要があります。(Studio では、`@MetaDataRetriever` によって返されたすべてのエンティティを含む操作がドロップダウンに表示されます。)`@Default("#[payload]")` としてアノテーションが付加された `Map<String,Object>` パラメータとして (`@MetaDataRetriever` によって返された) エンティティデータを受け取る必要もあります。
+
+[source,java,linenums]
+----
+@Processor
+public Map<String,Object> create(@MetaDataKeyParam String entityType, @Default("#[payload]") Map<String,Object> entityData) {
+    if ("Book_id".equals(entityType)) {
+        return createBook(entityData);
+    }
+    if ("Author_id".equals(entityType)) {
+        return createAuthor(entityData);
+    }
+    throw new RuntimeException("Entity not recognized");
+}
+private Map<String, Object> createAuthor(Map<String, Object> entityData) {
+    //CODE TO CREATE BOOK GOES HERE
+    return entityData;
+}
+private Map<String, Object> createBook(Map<String, Object> entityData) {
+    //CODE TO CREATE AUTHOR GOES HERE
+    return entityData;
+}
+----
+
+このメソッドでは、ドロップダウンの項目として `@MetaDataRetriever` によって返されたすべてのエンティティが Studio に表示されます。
+
+image::image3.png[]
+
+また、エンティティに関するメタデータは、DataMapper または DataWeave (Transform Message コンポーネント) などの他の Mule 要素に渡すことができます。
+
+image::image4.png[]
+
+////
+== Caching Metadata
+:keywords: metadata, cache, caching, datasense, key
+
+This feature allows the DevKit developer to enable a connector to retrieve metadata from a cache to decrease retrieval wait times overall, enhancing the connector user experience.
+
+=== Required Annotations @MetaDataCategory and @MetaDataCache
+
+To ensure an initialized cache is injected every time the metadata methods are invoked, the DevKit developer has to place `@MetaDataCategory` on the cache management/resolution class and declare the `@MetaDataCache` inside this class. After the `@MetaDataCache` cache is declared, it is persisted by DevKit.
+
+[source,java,linenums]
+----
+@MetaDataCategory
+public class CachedResolver {
+
+    @MetaDataCache
+    private MetaDataCache cache;
+
+    public void setCache(MetaDataCache cache) {
+        this.cache = cache;
+    }
+
+    //...
+}
+----
+
+The developer should make use of this cache internally when fetching metadata, and handle some level of consistency between the cache and the service.
+
+[IMPORTANT]
+The provided cache is evicted only when the developer of the Mule application executes *Clear DataSense MetaData* on the connector configuration. After clearing DataSense, a new cache is created.
+
+image::clear-datasense-metadata.png[]
+
+=== Example Implementation
+
+This is an example implementation of cache population and management with `@MetaDataKeyRetriever` (with helper method `populateKeysCache`) and `@MetaDataRetriever` (which invokes either of two helper methods `populateObjectsCache` and `buildMetaData`). With these the cache can be populated.
+
+[source,java,linenums]
+----
+@MetaDataCategory
+public class CachedResolver {
+
+    @MetaDataCache
+    private ConnectorMetaDataCache cache;
+
+    // An initialized Cache will be injected by DevKit automatically using this setter
+    public void setCache(ConnectorMetaDataCache cache) {
+        this.cache = cache;
+    }
+
+    @MetaDataKeyRetriever
+    public List<MetaDataKey> getMetaDataKeys() throws Exception {
+
+        // Cache will be initialized by this point.
+        // Usage will resemble that of a Map, storing and retrieving elements based on
+        // Serializable keys
+        if (!cache.get(STORED_KEYS_ID).isPresent()){
+            // If MetaDataKeys were not fetched before and persisted with the cache,
+            // then add all the keys to the cache
+            populateKeysCache();
+        }
+
+        Optional<Map<String, String>> stored_keys = cache.get(STORED_KEYS_ID);
+
+        // Based on the stored keys description, build the actual object
+        List<MetaDataKey> keys = new ArrayList<MetaDataKey>();
+        for (Map.Entry<String, String> entry : stored_keys.get().entrySet()) {
+            keys.add(new DefaultMetaDataKey(entry.getKey(), entry.getValue()));
+        }
+        return keys;
+    }
+
+    @MetaDataRetriever
+    public MetaData getMetaData(MetaDataKey key) throws Exception {
+        // Cache will be initialized by this point.
+        // If an object with this key was not stored previously in the cache
+        // then we'll do a best-effort load all the metadata information to the cache
+        // so it's present upon next invocation.
+        if (!cache.get(key.getId()).isPresent()){
+            populateObjectsCache();
+        }
+
+        Optional<Map<String, DataType>> dataFields = cache.get(key.getId());
+        // Based on the stored metadata description, build the actual object
+        return dataFields.isPresent() ? buildMetaData(dataFields.get(), key) : null;
+    }
+
+
+    private MetaData buildMetaData(Map<String, DataType> fields, MetaDataKey key) {
+        DefaultMetaDataBuilder builder = new DefaultMetaDataBuilder();
+        DynamicObjectBuilder<?> dynamicObject = builder.createDynamicObject(key.getId());
+
+        for (Map.Entry<String, DataType> simpleField : fields.entrySet()) {
+            dynamicObject.addSimpleField(simpleField.getKey(), simpleField.getValue());
+        }
+
+        return new DefaultMetaData(builder.build());
+    }
+
+    private void populateKeysCache() throws InterruptedException {
+        Map<String, String> keyStore = new HashMap<String, String>();
+        keyStore.put("ENTITY_TYPE_1", "Cached House Door");
+        keyStore.put("ENTITY_TYPE_2", "Cached House Window");
+
+        // All the keys are presisted in a Map under a general key in the cache
+        // allowing for a bulk retrieval later.
+        cache.put(STORED_KEYS_ID, (Serializable) keyStore);
+    }
+
+    private void populateObjectsCache() throws Exception {
+        Map<String, DataType> door = new HashMap<String, DataType>();
+        door.put("Color", DataType.STRING);
+        door.put("Altura", DataType.INTEGER);
+
+        Map<String, DataType> window = new HashMap<String, DataType>();
+        window.put("Rejas", DataType.BOOLEAN);
+        window.put("Marco", DataType.ENUM);
+
+        cache.put("ENTITY_TYPE_1", (Serializable) door);
+        cache.put("ENTITY_TYPE_2", (Serializable) window);
+    }
+
+}
+----
+////
+
+== 関連情報
+
+* xref:adding-query-pagination-support.adoc[クエリページネーションサポートの追加]
+* xref:adding-datasense-query-language.adoc[DataSense Query Language の追加]

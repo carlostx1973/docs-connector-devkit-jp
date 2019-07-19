@@ -1,0 +1,63 @@
+= 認証のサポート
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, 認証, 基本認証, 接続管理フレームワーク, HTTP 基本, oauth
+
+ほとんどのサービスは、アプリケーションがユーザに代わってサービスと通信するために何らかの認証を適用しています。
+
+*注意*: DevKit では、複数の `@ConnectionStrategy` アノテーションを使用して、コネクタの複数の認証方法を作成できます。
+
+クライアント側では、多くの Mule アプリケーションは同じ対象への複数の接続を管理する必要があります。たとえば、何千人ものユーザに代わって E コマースサイトとやりとりするアプリケーションの開発者は、有効な多数の接続を常に効率的に管理する必要があります。
+
+DevKit では、接続管理と認証サポートは密接に関連しています。ほとんどのプロトコルで汎用の接続管理フレームワークを使用できますが、OAuth 認証は接続管理を異なる方法で処理します。OAuth に馴染みがない場合は、さまざまな OAuth のしくみについて広く引用されている概要、&#8203;http://www.cubrid.org/blog/dev-platform/dancing-with-oauth-understanding-how-authorization-works/[Dancing with OAuth: Understanding How Authentication Works] (OAuth とダンスを: 認証のしくみを理解する) を参照してください。
+
+== 前提条件
+
+このドキュメントは、読者が少なくともいくつかの基本機能を備えたxref:creating-a-java-sdk-based-connector.adoc[コネクタプロジェクトを作成]済みで、コネクタに認証を実装する準備が整っていることを前提としています。
+
+== 接続管理フレームワークを使用した基本認証
+
+Anypoint DevKit では、`@Connector` クラスレベルで `@ConnectionManagement` アノテーションを適用することで、コネクタにユーザ名とパスワードの接続管理認証機能を簡単に追加できます。基本的なユーザ名とパスワード認証 (最も一般的) を使用した接続管理は、簡単に SAML、Kerberos、LDAP、NTLM などの他の OAuth 以外のプロトコルに一般化したり、カスタム接続を作成したりできます。
+
+このフレームワークでは、コネクタ開発者側の最小限の努力で、次の利点を得ることができます。
+
+* *透過的なマルチテナンシー* – Mule アプリケーションは多数のユーザに代わって接続するために異なるログイン情報を使用して、1 つの対象に対して多数の接続を開くことが可能。
+* *接続プーリング* –  接続リソースを効果的に管理するための、コネクタクラスのインスタンスプールの自動管理。
+* *例外* - 例外の発生時に自動的に接続を無効にし、必要に応じて再接続する機能。
+
+詳細は、xref:connection-management.adoc[「接続管理」]ガイドを参照してください。
+
+== HTTP 基本認証
+
+DevKit は、&#8203;https://www.ietf.org/rfc/rfc2617.txt[RFC-2617] で説明されているように HTTP 認証をサポートしています。  HTTP 認証を `@Connector` クラスの `@ConnectionStrategy` として実装できます。DevKit は要求に対する認証を透過的に管理します。
+
+詳細は、xref:http-basic-authentication.adoc[「HTTP 基本認証」]ガイドを参照してください。
+
+== OAuth V1
+
+Anypoint DevKit では、比較的簡単にコネクタに OAuth V1 を実装できます。`@Connector` クラスで OAuth V1 を実装するだけで、DevKit は対象サービスへのすべての要求を管理します。
+
+詳細は、xref:oauth-v1.adoc[「OAuth V1」]ガイドを参照してください。
+
+== OAuth V2
+
+OAuth V2 の DevKit サポートには、独自の形式の接続管理サポートが含まれています。`@Connector` クラスで OAuth2 を実装すると、DevKit は複数の接続を透過的に管理します。これには対象サービスへの複数の接続のアクセストークンの管理が含まれます。
+
+詳細は、xref:oauth-v2.adoc[「OAuth V2」]ガイドを参照してください。
+
+== その他の認証スキームを使用した接続管理
+
+Anypoint DevKit は、接続管理フレームワークを使用可能にします。複数の同時接続のログイン情報管理を提供し、効率的な接続の再利用を可能にする接続インスタンスをプールし、失われた接続の無効化と必要に応じた再接続の自動処理を提供します。
+
+xref:connection-management.adoc[「接続管理」]に、`@Connector` クラスメソッドへのアノテーションを使用してコネクタに接続管理を適用する方法が説明されてます。この例は基本的なユーザ名/パスワード認証でのアノテーションの使用を示していますが、他のメソッドにも同じ方法が適用されます。
+
+認証をまったく使用しないコネクタに接続管理を適用することもできます。認証なしでコネクタに接続管理を実装する方法についての詳細は、xref:creating-a-connector-for-a-soap-service-via-cxf-client.adoc[「CXF クライアントを介した SOAP サービスへのコネクタの例」]を参照してください。
+
+== 関連情報
+
+* xref:connection-management.adoc[接続管理] (ユーザ名とパスワード認証)
+* xref:http-basic-authentication.adoc[HTTP 基本認証]
+* xref:oauth-v1.adoc[OAuth V1]
+* xref:oauth-v2.adoc[OAuth V2]
+* xref:anypoint-connector-development.adoc[「Anypoint コネクタ開発」]に戻る

@@ -1,0 +1,135 @@
+= 接続戦略の設定
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, 戦略, コネクタ, oauth, config, 接続, 認証
+
+DevKit 3.6 以降、接続は `@Connector` レベルでサポートされなくなりましたが (OAuth V1 を除く)、「設定」クラスで定義され、`@Connector` に挿入されるようになりました。
+
+この設定クラスをコネクタに挿入するには、コネクタクラスの項目に `@Config` アノテーションを付加します。
+
+このアプローチは複数の認証種別をサポートする最も簡単な方法で、これによってコネクタの開発環境が改善されます。
+
+*注意*: `@Config` による挿入では、OAuth V1 はサポート​*されていません*。
+
+== 前提条件
+
+このドキュメントは、読者が xref:index.adoc[Anypoint コネクタ DevKit] に精通していて、コネクタに認証を実装する準備が整っていることを前提としています。また、xref:authentication-methods.adoc[認証方法]に精通している必要もあります。
+
+== @Config を @Connector に追加する
+
+設定クラスを追加して、コネクタに挿入する手順は、次のとおりです。
+
+. 接続戦略の新しい Java クラスを作成します。これは各自の設定クラスになります。
+. いずれかの DevKit 認証方法を使用して、クラスにアノテーションを付加します。この例では、`@ConnectionManagement` を使用します。
+. 認証ロジックや接続管理を開発します。
+. 最後に、`@Connector` アノテーション付きクラスで、新しい戦略への参照が含まれる `@Config` 項目を作成して接続戦略クラスを参照します。コネクタ操作ロジックは、サービスとの接続のロジックとは別に定義されます。
+
+== 例
+
+次の例は、`@Config` を使用して設定を挿入する `@Connector` を示しています。
+
+
+[source,java,linenums]
+----
+@Connector(name="myconnector", schemaVersion="1.0", friendlyName="Connector")
+public class MyConnector
+{
+    @Config
+    private Config config;
+
+    public void setMyProperty(Config config)
+    {
+        this.strategy = strategy;
+    }
+
+    public Config getConfig()
+    {
+        return this.config;
+    }
+        ...
+}
+----
+
+次のコードでは、上記で挿入された設定ファイルで `@ConnectionManagement` ブロックが宣言されています。
+
+[source,java,linenums]
+----
+@ConnectionManagement(friendlyName="Connection Management", configElementName="demo-config")
+public class ConnectionManagementStrategy
+{
+   Private Service service;
+   @Connect
+   public void connect(@ConnectionKey String username, @Password String password)
+       throws ConnectionException {
+         service = new Service(username);
+       try{
+         service.connect(password);
+       }catch(Exception){
+       throw new ConnectionException(...);
+       }
+   }
+
+   @Disconnect
+   public void disconnect() {
+       service.disconnect();
+   }
+
+   @ValidateConnection
+   public boolean isConnected() {
+       return service.connectionStatus();
+   }
+
+   @ConnectionIdentifier
+   public String connectionId() {
+       return service.getConnectionId();
+   }
+}
+----
+
+== 1 つのコネクタで複数の認証モデルをサポートする
+
+Anypoint コネクタ DevKit では、同じコネクタで複数の認証モデルを使用できます。この LDAP コネクタは、この機能をサポートするためのコネクタコードの構築方法を示しています。
+
+このコネクタは、設定の継承元の基本設定種別 `AbstractConfig` を挿入します。
+
+. `AbstractConfig.java` は、1 つのファイルで宣言されます。
++
+[source,java,linenums]
+----
+public abstract class AbstractConfig
+{ ... }
+----
++
+. その子クラスは、個別のファイルで宣言されます。これらの戦略は、それぞれキャッシュと TLS を目的としています。
++
+.LDAPCacheConfig.java
+[source,java,linenums]
+----
+@ConnectionManagement(friendlyName = "Configuration", configElementName = "config")
+public class LDAPCacheConfig extends AbstractConfig { ... }
+----
++
+.LDAPTlsConfig.java
+[source,java,linenums]
+----
+@ConnectionManagement(friendlyName = "TLS Configuration", configElementName = "tls-config")
+public class LDAPTlsConfig extends AbstractConfig
+{ ... }
+----
++
+. `LDAPConnector.java` クラスでは、抽象設定が挿入されます。
++
+[source,java,linenums]
+----
+public class LDAPConnector
+{ ... @Config AbstractConfig config; ... }
+----
+
+ユーザは、異なる接続戦略を子クラスとして使用して抽象基本クラスまたはインターフェースを宣言し、認証ロジックや接続管理 (該当する場合) を実装できます。
+
+同じコネクタで OAuth 認証と基本認証の両方をサポートすることは、同じ XML 名前空間に 2 つの設定要素が含まれることを意味します。これを有効にするには、接続戦略アノテーションのパラメータ `configElementName` を使用します。
+
+たとえば、LDAP コネクタの場合、`LDAPTlsConnection` クラスは `configElementName` をデフォルト値の `config` ではなく `tls-config` に設定し、`LDAPCacheConnection` は `configElementName` にデフォルト値を使用します。結果として、XML で `ldap:tls-config` または `ldap:config` を使用して、必要なバージョンのコネクタを選択します。Anypoint Studio では、コネクタの設定時に次の画面でこれが表示されます。
+
+image::ldaptypes.png[LDAPtypes]

@@ -1,0 +1,7 @@
+= コネクタテストフレームワーク
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, テスト, フレームワーク, ctf, 機能テスト,
+
+コネクタの機能テストの背景情報や最新の実装については、&#8203;https://mulesoft.github.io/connector-testing-framework/[「コネクタテストフレームワーク」]を参照してください。

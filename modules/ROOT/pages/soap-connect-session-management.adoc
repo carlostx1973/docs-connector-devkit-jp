@@ -1,0 +1,127 @@
+= SOAP セッション管理
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: soap 接続, セッション管理, wsdl, Web サービス, soap
+
+SOAP ベースのコネクタ開発をサポートするために、*DevKit 3.9.0* にはコネクタ開発者がトークンを必要とする SOAP サービス接続、SOAP セッション、またはサービス操作用に​*セッショントークン*​を定義するためのオプションが用意されています。
+
+== はじめに
+
+`@Connect` メソッド内のコネクタコードからセッショントークンを作成し、SOAP サービスが必要とする操作に従って利用します。
+
+これは、コネクタを通じたサービスへのユーザアクセスを管理するための手法です。本文内のセッショントークンの配置についての詳細は、<<enriching-soap-body-with-session-token,「セッショントークンを使用した SOAP 本文の強化」>>を参照してください。
+
+セッション管理によって次の操作を行うことができます。
+
+* セッショントークンを次の項目に挿入する。
+** HTTP Cookie およびヘッダー
+** SOAP ヘッダー
+** SOAP ペイロード: メッセージペイロードの管理を行うチェーン。これは、WSDL コンシューマが管理する必要がある場合もあります。
+* セッションの有効期限/タイムアウトを管理する。
+* (設定および再接続に関する) 接続管理情報を取得する。
+//todo: i did not create the term 'connection intelligence', but I figure it means that the developer could use the session token to allow a reconnection using the same token. Or is it better practice to use a different session token to identify a 'reconnection', or none of our business to determine that?
+
+== 要件
+
+コネクタのセッション管理を有効にするには、`Config` クラスに `@WsdlProvider` および `@ConnectionManagement` のアノテーションを付ける必要があります。これらには、それぞれ次のメソッドの実装が必要です。
+
+WSDL 管理:
+
+* @WsdlServiceRetriever
+* @WsdlServiceEndpoint
+
+接続管理:
+
+* @Connect
+* @Disconnect
+* @ValidateConnection
+
+下の<<wsdlprovider-with-session-management,「セッション管理を使用した @WsdlProvider」>>セクションのセッション管理対応の設定クラスのスタブを参照してください。
+
+== セッション管理を使用したコネクタライフサイクル
+
+コネクタのライフサイクルは、メタデータの取得および操作の呼び出し中に「セッション制御」によって変更されます。メタデータの取得および操作の呼び出しを行う前に、コネクタインスタンスがプールから取得されるかプールで作成され、続いて接続を初期化するために `@Connect` メソッドが呼び出されます。
+
+接続プーリングの仕組みは現在のxref:connection-management.adoc#about-connection-management[接続管理]メカニズムに似ていて、コネクタ設定タブから使用できるコネクタインスタンスの同じ種類のプール設定を使用します。ユーザはそこから既存のコネクタインスタンスの設定や新規作成を行います。
+
+`@Connect` メソッドは `@WsdlProvider` メソッドの前に呼び出されるため、`@Configurable` 項目または `@Connect` パラメータを使用してコネクタに必須のすべてのパラメータを指定する必要があります。セッショントークンなどの結果を保存するために、初期化は `@Connect` メソッド内で行われる場合があります。
+
+== セッション管理を使用した @WsdlProvider
+
+下の `@WsdlProvider` 設定クラスの構造を確認すると、セッショントークンが `@Connect` メソッドで作成され、ケースに応じて SOAP メッセージのいずれかの部分が必要な場合に使用するためにインスタンス項目に保存されるのが分かります。
+//todo: describe instance field
+
+[source,java,linenums]
+----
+@WsdlProvider(friendlyName = "Configuration")
+@ConnectionManagement
+public class Config {
+
+    private String username;
+    private String password;
+
+    @Configurable
+    @Default("http://localhost:8088/mockTshirt")
+    @Placement(order = 3)
+    private String endpoint;
+
+    @Connect
+    @TestConnectivity
+    public void connect(@ConnectionKey String username,  @Password String password)  throws ConnectionException {
+        // obtain session token
+    }
+
+    @Disconnect
+    public void disconnect() {
+        // end connection
+    }
+
+    @ValidateConnection
+    public boolean isConnected() {
+        return false;
+    }
+
+    @WsdlServiceRetriever
+    public ServiceDefinition getServiceDefinition() {
+           return new DefaultServiceDefinition("ServiceID", "tshirt", "tshirt.wsdl","TshirtService","TshirtServicePort");
+    }
+
+    @WsdlServiceEndpoint
+    public String getServiceEndpoint(ServiceDefinition definition) {
+         return endpoint;
+    }
+
+    @WsdlHeaders
+    public List<Document> cookHeaders(ServiceDefinition serviceDefinition, String operationName){
+        // Customize headers with session token
+    }
+
+    @WsdlTransportRetriever
+    public WsdlTransport resolveTransport(ServiceDefinition serviceDefinition) {
+        return new HttpBasicWsdlTransport(getUsername(), getPassword());
+    }
+
+    // ...
+}
+----
+
+== セッショントークンを使用した SOAP 本文の強化
+
+DevKit 3.9.0 のリリースにより、`@WsdlBodyEnricher` を使用してセッショントークンを SOAP 本文に挿入できるようになりました。
+
+=== @WsdlBodyEnricher
+
+`@WsdlBodyEnricher` とマークの付いたメソッドはメッセージペイロードを表すオブジェクトを受信し、セッショントークを使用して変更してから返します。
+
+[source,java,linenums]
+----
+@WsdlBodyEnricher
+    public Document cookPayload(ServiceDefinition serviceDefinition, String operationName, Document payload){
+        // Customize payload with session token
+    }
+----
+
+== 関連情報
+* 詳細は、xref:creating-a-soap-connector.adoc[「SOAP コネクタの作成」]を参照してください。
+* xref:connection-management.adoc#about-connection-management[接続管理]の基本的な DevKit サポートにアクセスする

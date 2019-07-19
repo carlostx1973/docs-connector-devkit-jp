@@ -1,0 +1,300 @@
+= チュートリアル - Barn Connector
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, barn, コネクタ, javadoc, Studio, ui
+
+このドキュメントでは、Anypoint Studio でコネクタを構築し、インストールしてテストするために必要な手順について説明します。
+
+次のチュートリアルでは、ブラウザに「Mule has been placed in the barn (Mule は家畜小屋に入れられた)」と表示するシンプルなコネクタの作成方法について説明します。Anypoint Studio でコネクタのユーザインターフェースを使用してどの動物を家畜小屋に入れるかを変更できます。
+
+== コネクタを作成する前に
+
+. 以下をインストールします。
+.. http://www.oracle.com/technetwork/java/javase/downloads/java-archive-downloads-javase7-521261.html[Java 7]
+.. http://maven.apache.org/download.cgi[Maven]
+.. http://www.mulesoft.org/download-mule-esb-community-edition[Studio]
+. Anypoint Studio を起動します。
+. Maven を設定します。
+.. *[Anypoint Studio]* > *[Preferences (プリファレンス)]* > *[Anypoint Studio]* > *[Maven Settings (Maven 設定)]* をクリックします。DevKit 3.7 で最初にコネクタを作成するときに Maven が設定されていない場合、インストールするよう促されます。
+. DevKit プラグインをインストールします。
+.. *[Install New Software (新規ソフトウェアをインストール)]* をクリックします。
+.. *[Work with (連携)]* > *[Anypoint Addons Update Site (Anypoint アドオン更新サイト)]* > *[Anypoint Devkit Plugin (Anypoint Devkit プラグイン)]* をクリックします。
+.. *[Next (次へ)]*、*[Finish (完了)]* をクリックし、Studio を再起動します。
+
+== コネクタプロジェクトの作成
+
+. 最初の Barn コネクタを作成します。*[File (ファイル)]* > *[New (新規)]* > *[Project (プロジェクト)]* > *[Anypoint Connector Project (Anypoint コネクタプロジェクト)]* を使用します。コネクタに​*「Barn」*​と名前を付けます。その他のすべての項目は同じままで問題ありません。*[Finish (完了)]* をクリックします。Studio コンソールに警告メッセージが表示された場合、無視しても問題ありません。
+. コネクタの骨組みを確認します。
++
+[source,java,linenums]
+----
+/**
+ * (c) 2003-2015 MuleSoft, Inc. The software in this package is published under the terms of the CPAL v1.0 license,
+ * a copy of which has been included with this distribution in the LICENSE.md file.
+ */
+package org.mule.modules.barn;
+import org.mule.api.annotations.ConnectionStrategy;
+import org.mule.api.annotations.Connector;
+import org.mule.api.annotations.Configurable;
+import org.mule.api.annotations.Processor;
+import org.mule.api.annotations.param.Default;
+import org.mule.modules.barn.strategy.ConnectorConnectionStrategy;
+/**
+ * Anypoint Connector
+ *
+ * @author MuleSoft, Inc.
+ */
+@Connector(name="barn", schemaVersion="1.0", friendlyName="Barn")
+public class BarnConnector
+{
+    /**
+     * Configurable
+     */
+    @Configurable
+    @Default("value")
+    private String myProperty;
+    @ConnectionStrategy
+    ConnectorConnectionStrategy connectionStrategy;
+    /**
+     * Custom processor
+     *
+     * {@sample.xml ../../../doc/barn-connector.xml.sample barn:my-processor}
+     *
+     * @param content Content to be processed
+     * @return Some string
+     */
+    @Processor
+    public String myProcessor(String content) {
+        /*
+         * MESSAGE PROCESSOR CODE GOES HERE
+         */
+        return content;
+    }
+    /**
+     * Set property
+     *
+     * @param myProperty My property
+     */
+    public void setMyProperty(String myProperty) {
+        this.myProperty = myProperty;
+    }
+    /**
+     * Get property
+     */
+    public String getMyProperty() {
+        return this.myProperty;
+    }
+    public ConnectorConnectionStrategy getConnectionStrategy() {
+        return connectionStrategy;
+    }
+    public void setConnectionStrategy(ConnectorConnectionStrategy connectionStrategy) {
+        this.connectionStrategy = connectionStrategy;
+    }
+}
+----
+
+== コネクタのコーディング
+
+コネクタをコーディングする手順は、次のとおりです。
+
+. Studio で、メインの Java ファイル *`src/main/java/org/mule/modules/barn/BarnConnector.java`* を開きます。
++
+image::barnjava.png[BarnJava]
++
+. コネクタクラスで、最後の閉じ波括弧の前、既存の `@Processor` ブロックの後に次のコードを貼り付けます。
++
+[source,java,linenums]
+----
+/**
+ * Custom processor that places an animal in the barn.
+ *
+ * {@sample.xml ../../../doc/barn-connector.xml.sample barn:putInBarn}
+ *
+ * @param animal Name of the animal to be place in the barn
+ * @return returns processed message
+ */
+@Processor(friendlyName="Put an animal in the barn")
+public String putInBarn(@Placement(group="Parameters")
+  @FriendlyName("The animal's name") String animal) {
+        return animal + " has been placed in the barn";
+    }
+----
++
+`@Sample` ステートメントのパス名は、Studio の Javadoc *.xml.sample ファイルへのパスを示しています。ファイルシステムパスではありません。コネクタの各 Javadoc サンプルファイルについて、xml.sample ファイルで対応するステートメントを指定します。 +
+ +
+`@Processor` で始まる行は、プロセッサ関数を示し、コネクタのユーザインターフェースを指定します。 +
+`@FriendlyName` で始まる行は、コネクタが Anypoint Studio で実行されたときにブラウザに表示される UI 要素を示しています。
++
+このコードにより、操作名が「Put an animal in the barn (動物を家畜小屋に入れる)」に変更され、[Animal (動物)] 指示画面が「The animal's name (動物の名前)」に変更されます。挿入後、`@Placement` および `@FriendlyName` にはエラー条件としてアンダースコアが付きます。各アノテーションの上にカーソルを置き、ポップアップメニューから *import* コマンドを選択して import コマンドをコネクタに追加します。
++
+image::barnimportanno2.png[BarnImportAnno2]
++
+image::barnimportannotation.png[BarnImportAnnotation]
++
+. map-payload ステートメントを指定してコネクタで将来 Javadoc のドキュメント化を行うために loading ステートメントを追加します。
+.. *doc/barn-connector.xml.sample* を開きます。
++
+[source,xml,linenums]
+----
+<!-- BEGIN_INCLUDE(barn:my-processor) -->
+  <barn:my-processor config-ref="" content="#[map-payload:content]" />
+<!-- END_INCLUDE(barn:my-processor) -->
+----
++
+.. コネクタの各 `@Processor` ステートメントでは 1 つの BEGIN/END ブロックを含めます。2 番目の `@Processor` ステートメントブロックでは次の各行を追加します。
++
+[source,text,linenums]
+----
+<!-- BEGIN_INCLUDE(barn:my-processor) -->
+  <barn:put-in-barn config-ref="" animal="#[map-payload:content]" />
+<!-- END_INCLUDE(barn:my-processor) -->
+----
++
+// Complete barn-connector.xml.sample file
+.. このファイルを保存します。
+. 赤い下線が付いたテキストの上にカーソルを置いて *[Disable spell checking (スペルチェックを無効化)]* をクリックしてスペルチェックを無効にします。
++
+image::barndisablespellchecking.png[BarnDisableSpellChecking]
++
+. 完成したコネクタのコードは次のようになります。
++
+完成したコネクタのコードを表示します。
++
+[source,java,linenums]
+----
+/**
+ * (c) 2003-2014 MuleSoft, Inc. The software in this package is published under the terms of the CPAL v1.0 license,
+ * a copy of which has been included with this distribution in the LICENSE.md file.
+ */
+package org.mule.modules.barn;
+import org.mule.api.annotations.ConnectionStrategy;
+import org.mule.api.annotations.Connector;
+import org.mule.api.annotations.Configurable;
+import org.mule.api.annotations.Processor;
+import org.mule.api.annotations.display.FriendlyName;
+import org.mule.api.annotations.display.Placement;
+import org.mule.api.annotations.param.Default;
+import org.mule.modules.barn.strategy.ConnectorConnectionStrategy;
+/**
+ * Anypoint Connector
+ *
+ * @author MuleSoft, Inc.
+ */
+@Connector(name="barn", schemaVersion="1.0", friendlyName="Barn")
+public class BarnConnector
+{
+    /**
+     * Configurable
+     */
+    @Configurable
+    @Default("value")
+    private String myProperty;
+    @ConnectionStrategy
+    ConnectorConnectionStrategy connectionStrategy;
+    /**
+     * Custom processor
+     *
+     * {@sample.xml ../../../doc/barn-connector.xml.sample barn:my-processor}
+     *
+     * @param content Content to be processed
+     * @return Some string
+     */
+    @Processor
+    public String myProcessor(String content) {
+        /*
+         * MESSAGE PROCESSOR CODE GOES HERE
+         */
+        return content;
+    }
+    /**
+     * Custom processor that places an animal in the barn.
+     *
+     * {@sample.xml ../../../doc/barn-connector.xml.sample barn:putInBarn}
+     *
+     * @param animal Name of the animal to be place in the barn
+     * @return returns processed message
+     */
+    @Processor(friendlyName="Put an animal in the barn")
+    public String putInBarn(@Placement(group="Parameters")
+      @FriendlyName("The animal's name") String animal) {
+            return animal + " has been placed in the barn";
+    }
+    /**
+     * Set property
+     *
+     * @param myProperty My property
+     */
+    public void setMyProperty(String myProperty) {
+        this.myProperty = myProperty;
+    }
+    /**
+     * Get property
+     */
+    public String getMyProperty() {
+        return this.myProperty;
+    }
+    public ConnectorConnectionStrategy getConnectionStrategy() {
+        return connectionStrategy;
+    }
+    public void setConnectionStrategy(ConnectorConnectionStrategy connectionStrategy) {
+        this.connectionStrategy = connectionStrategy;
+    }
+}
+----
+
+== Studio でのコネクタの識別
+
+Anypoint コネクタプロジェクトを作成すると、Studio は名前、スキーマバージョン、分かりやすい名前が含まれる `@Connector` アノテーションを作成します。
+
+コネクタは `@Connector` アノテーションを使用してコネクタのコンテンツを記述します。`friendlyName` パラメータは Studio パレットでのコネクタの表示ラベルを定義します。
+
+[source,text,linenums]
+----
+@Connector(name="barn", schemaVersion="1.0", friendlyName="Barn")
+----
+
+Studio にコネクタをインストールした後で、ユーザが Mule プロジェクトを作成すると、friendlyName によってコネクタが識別されます。
+
+image::connector-display.png[]
+
+== コネクタのインストール
+
+. プロジェクトのインストール: Package Explorer でコネクタプロジェクトの名前を右クリックし、*[Anypoint Connector (Anypoint コネクタ)]* > *[Install or Update (インストールまたは更新)]* をクリックします。
+. 指示に従って詳細、ライセンス契約の条件を受け入れ、未署名のコンテンツでソフトウェアをインストールします。Studio を再起動して変更を有効にします。続いて、コネクタを Mule プロジェクトに含むことができるようになります。
+
+== コネクタを使用する Mule プロジェクトの作成
+
+. Studio の再起動後に、*[File (ファイル)]* > *[New (新規)]* > *[Mule Project (Mule プロジェクト)]* を使用して Mule プロジェクトを作成します。
+. 「http」を検索し、HTTP コネクタをキャンバスにドラッグします。デフォルト設定で問題ありません。
+. 「barn」を検索し、Barn コネクタをキャンバスにドラッグします。  +
+キャンバスの表示は次のようになります。
++
+image::barnflow.png[BarnFlow]
++
+Barn コネクタを設定する手順は次のとおりです。
++
+.. 緑のプラス記号をクリックします。
++
+image::barnpanel1.png[BarnPanel1]
++
+.. 画面の表示が次のようになることを確認し、*[OK]* をクリックします。
++
+image::barnpanel2.png[BarnPanel2]
++
+[My Property (私のプロパティ)] および [My Strategy Property (私の戦略プロパティ)] の 2 つの値はデフォルトのコネクタによって指定されます。これらは無視しても問題ありません。
+.. 最初の画面で、*[Operation (操作)]* をクリックして *[Put in barn (家畜小屋に入れる)]* をクリックします。*[Animal (動物)]* 項目で ** `Mule`** 動物などの名前を指定します。
++
+image::barnpanel3.png[BarnPanel3]
++
+. *[Run (実行)]* > *[Run As (別のユーザとして実行)]* > *[Mule Application (Mule アプリケーション)]* をクリックして Mule プロジェクトをデプロイします。
+. ブラウザを開いてアドレスを http://0.0.0.0:8081 に設定します。ブラウザの表示は次のようになります。
++
+image::barnbrowser.png[BarnBrowser]
++
+. [Animal (動物)] の値を変更し、プロジェクトを保存して、ブラウザを更新すれば別の動物を家畜小屋に入れることができます。
+
+== 関連情報
+
+* **次のステップ:** コネクタでxref:authentication.adoc[認証]を実装します。
+* xref:installing-and-testing-your-connector-in-studio.adoc[コネクタの構築およびインストール]

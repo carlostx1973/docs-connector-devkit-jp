@@ -1,0 +1,1407 @@
+= Anypoint コネクタ DevKit チュートリアル
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: DevKit チュートリアル, 機能, cookbook
+:resourcesDir: resources
+:tutorial: Cookbook
+:author: MuleSoft Inc.
+
+== チュートリアルの目標
+
+Anypoint コネクタ DevKit を使用して Web サービスへのコネクタを作成する方法について学習します。
+
+DevKit は xref:3.9@mule-runtime::anypoint-connectors.adoc[Anypoint コネクタ]の作成に役立ちます。このチュートリアルでは、認証、接続、サービス操作などをサポートするようにコネクタをコーディングする方法について説明します。これは、コネクタ開発者がコネクタのエンドユーザ (Mule アプリケーション開発者) に公開する機能です。
+
+== Anypoint コネクタ DevKit とは?
+
+xref:index.adoc[Anypoint コネクタ DevKit] は、Anypoint コネクタのコーディングを容易にする、Anypoint Platform の不可欠な開発ツールです。DevKit は、Mule アプリケーションの一部として実行できる再利用可能なコンポーネントを作成するために使用でき、&#8203;http://www.mulesoft.com/platform/mule-studio[Anypoint Studio] から容易に設定できる Maven ベースのツールです。
+
+DevKit は、Mule Runtime や Anypoint Studio とやり取りするためのコードとファイルを生成する http://docs.oracle.com/javase/tutorial/java/annotations/[Java アノテーション]をコネクタ開発者に公開します。生成されたコードでは、コネクタと Mule 間のインターフェースが提供されます。これがない場合、各コネクタ開発者は広範な定型コードのほか、Anypoint Studio でコネクタとやり取りするために必要なコードやファイルを含める必要があります。
+
+== コネクタとは?
+
+Anypoint コネクタは、Mule Runtime および Anypoint Studio とやり取りする再利用可能なコンポーネントです。コネクタは対象リソースと通信し、リソースと Mule 間で情報を伝送するほか、データを Mule メッセージに変換します。
+
+Anypoint コネクタ DevKit は、Mule と外部サービスまたは API 間で発生する通信を抽象化します。また、最終的にアプリケーションでコネクタを使用する開発者がコネクタを簡単に使用できるようにするためのユーザインターフェースを生成します。
+
+適切に開発されたコネクタを使用すると、ページネーション、セッションの有効期限、入出力メタデータなどのタスクを処理する場合に、ユーザの Mule アプリケーションの開発が大幅に容易になります。このチュートリアルでは、適切にデザインされたコネクタを作成する方法について説明します。
+
+== DevKit を使用してコネクタを作成する理由は?
+
+次のような場合に独自のコネクタを作成することが望まれます。
+
+* Mule アプリケーションから API をコンシュームする必要があり、同じコネクタを使用することで開発者が確実に一貫性を維持できるようにしたい。
+* API があり、Web サービスへのインターフェースを提供するコネクタを開発者に提供することでビジネスに戦略的価値を加えたい。
+* SaaS やオンプレミスの Web サービス、アプリケーション、およびデータソースとのインテグレーションを促進したい。
+* コンシュームする API がページネーションやバッチをサポートするか、SQL 機能を持つ。
+* コンシュームする API にさまざまなエンティティ種別があるか、その構造が API/サービス操作によって異なる。
+* Mule コアを拡張したい。
+
+== 前提条件
+
+コネクタを開発する前に、Mule、Anypoint Studio、および Java 開発全般に関する実用的な知識、特に https://docs.oracle.com/javase/tutorial/java/annotations/basics.html[Java アノテーション]の使用に関する知識が必要です。
+
+[NOTE]
+====
+ソフトウェアのセットアップおよび DevKit についての詳細は、xref:setting-up-your-dev-environment.adoc[「開発環境のセットアップ」]およびxref:index.adoc[「Anypoint コネクタ DevKit」]を参照してください。
+
+*コネクタは Windows、Mac、または Linux マシンで開発できます。*
+====
+
+
+[[get-cookbook]]
+== Cookbook を取得する
+
+GitHub に保存されている Cookbook チュートリアルを取得します。
+
+. https://github.com/mulesoft/mule-cookbook[https://github.com/mulesoft/mule-cookbook] リポジトリをローカルマシンに複製します。たとえば、目的の開発フォルダに複製するには、次のコマンドを実行します。
++
+[source,console,linenums]
+----
+cd ~/dev
+git clone https://github.com/mulesoft/mule-cookbook.git
+----
++
+. 新しく作成した `mule-cookbook` ディレクトリに入り、次の Maven コマンドを実行します。
++
+[source,console,linenums]
+----
+mvn install eclipse:eclipse
+----
++
+////
+As the connector has not yet been built, you should receive a FAILURE to build the Mule Cookbook Anypoint Connector
+todo
+[INFO] Reactor Summary:
+[NOTE]
+[INFO] mule-cookbook ...................................... SUCCESS [  1.002 s]
+[INFO] model .............................................. SUCCESS [  1.823 s]
+[INFO] webservice ......................................... SUCCESS [  2.161 s]
+[INFO] soap-server ........................................ SUCCESS [  9.675 s]
+[INFO] rest-server ........................................ SUCCESS [  2.729 s]
+[INFO] Mule Cookbook Server Application ................... SUCCESS [ 11.379 s]
+[INFO] sdk-client ......................................... SUCCESS [  6.066 s]
+[INFO] Mule Cookbook Anypoint Connector ................... FAILURE [ 12.956 s]
+[INFO] mule-cookbook-service .............................. SKIPPED
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+////
+. 完了したら、Anypoint Studio を開き、`mule-cookbook` ディレクトリを既存のプロジェクトとしてインポートします。*[File (ファイル)]* > *[Import (インポート)]* > *[Existing Projects into Workspace (既存のプロジェクトをワークスペースへ)]* を選択します。
++
+image::devkit-tutorial-30756.png[既存のインポート - mule-cookbook]
+
+これで、上の画面に表示されているいくつかのフォルダが Studio のワークスペースに作成されます。ワークスペースは *Package Explorer* で確認できます。
+
+== Cookbook についての説明
+
+先に進む前に Cookbook サービスについて簡単に説明します。この Web サービスは、ユーザが Web からアクセス、保存、または更新したい材料やレシピを整理するのに役立ちます。
+
+=== Cookbook API の説明
+
+この API を使用すると、ユーザは 1 つまたは複数のレシピと材料に対して CRUD (create、read、update、delete) 操作を使用できます。また、この API を使用すると、最近追加されたレシピを参照することもできます。
+
+この API は次のように公開されます。
+
+* https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/resources/wsdl/IMuleCookBookService.wsdl[WSDL] ファイルを使用する SOAP サービスとして
+* https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/api.raml[RAML] ファイルを使用する REST API として、および
+* Java https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/IMuleCookBookClient.java[SDK] として
+
+
+=== 認証
+
+このコネクタは次の認証メカニズムをサポートします。
+
+* 要求の一部として各要求と共に送信するトークンを提供する、ユーザ名とパスワードを使用するカスタム認証。
+
+* http://oauth.net/2/[OAuthV2]
+
+==== ログイン情報
+
+===== カスタム認証:
+[%header,cols="2*"]
+|===
+| Username (ユーザ名)
+| Password (パスワード)
+
+| admin
+| admin
+|===
+
+===== OAuth:
+[%header,cols="2*"]
+|===
+| Client ID (クライアント ID)
+| Client Secret (クライアントシークレット)
+
+| ePU9CxyEVFIXF9nMoGH16s1lUGe5JYPPzClnnVBG
+| YeKAsQCdr264tNmDdvTdJUAh9TQraJqZpwbEoTuz
+|===
+
+[[connecting-to-service]]
+=== サービスへの接続
+
+この Web サービスはオンラインで使用できます。
+
+* SOAP バージョンをコンシュームするには、SDK は次のアドレスへの要求を実行します: `+http://devkit-cookbook.cloudhub.io/soap+`。
+
+* REST のベース URL は `+http://devkit-cookbook.cloudhub.io/rest+` です。
+
+** OAuth 認証 URL は */oauth/authorize* です。
+
+** アクセストークン URL は */oauth/accessToken* です。
+
+[NOTE]
+====
+また、開始準備がすでに整っているサーバ用のソースコードが用意されているため、これをローカルで実行することもできます。
+
+com.cookbook.tutorial.service.MuleStoreServer クラスを実行するだけで、ローカルの SOAP サーバをソープサーバプロジェクトから実行できます。
+
+デフォルトでは、サーバはアドレス `+http://localhost:9090/cook-book+` で開始されます。
+
+com.cookbook.tutorial.Main クラスを実行するだけで、ローカルの REST サーバを REST サーバプロジェクトから実行できます。
+
+デフォルトでは、サーバはアドレス `+http://localhost/9091+` で開始されます。
+====
+
+== Cookbook コネクタの作成手順
+
+{tutorial} サービス用の基本コネクタを作成するには、次の手順を実行する必要があります。
+
+. コネクタプロジェクトを作成します。
+. サービスへの接続で使用するクライアントが含まれる連動関係を追加します。
+. サービスをホストする URL をユーザが指定できるように設定可能な URL を追加します。
+. Anypoint Studio でユーザがコンシュームできる操作を追加します。
+
+=== {tutorial} コネクタの作成
+
+<<get-cookbook,上述>>の手順に従って `mule-cookbook` ディレクトリを既存のプロジェクトとしてワークスペースにインポートしている場合、コネクタプロジェクトの作成に着手して、コーディングを開始できます。
+
+. Anypoint Studio で *[File (ファイル)]* > *[New (新規)]* > *[Anypoint Connector Project (Anypoint コネクタプロジェクト)]* をクリックするか、Package Explorer でプロジェクト名を右クリックして *[New (新規)]* > *[Anypoint Connector Project (Anypoint コネクタプロジェクト)]* をクリックします。
++
+image::new-connector-1.png[width="500"]
++
+. 作成するプロジェクト種別を選択します。この場合は、*[SDK Based (SDK ベース)]* を選択します。
++
+image::new0.png[width="500"]
++
+. コネクタの名前を指定し、デフォルトの生成を必ずオフにしてから *[Finish (完了)]* をクリックします。
++
+image::new1.png[width="550"]
++
+これにより、構造とすべての必須要素 (スケルトンコネクタ、アイコン、サンプルドキュメントファイルを含む。ただし、コネクタの基本テストは含まない) を含むプロジェクトが生成されます。
++
+image::new-connector-3.png[width="600","new-connector-3"]
+
+[TIP]
+DevKit ビューを有効にするには、上部バーから *[Window (ウィンドウ)]* > *[Show View (ビューを表示)]* > *[Other (その他)]* をクリックし、*[MuleSoft]* ドロップダウンで DevKit を探します。
+
+
+.コネクタのコンパクトビューが表示される DevKit ビュー。
+image::enable-view.png[width="300"]
+
+[[using-config]]
+== 接続設定
+
+サービスをコンシュームする場合、さまざまな値を設定して接続を確立する必要があります。
+
+接続設定戦略の開発を容易にするため、DevKit には 1 組のアノテーションが用意されており、これらを使用して、以下の定義を複数のクラス内でモジュール化できます。
+
+* ユーザに公開する動作。`@Connector` アノテーションを使用します。
+* 接続設定に関連するコードが、`@Config` アノテーションを追加した場所に挿入されます。使用できるいくつかの設定種別があり、それらをこのチュートリアルで見ていきます。
+
+[TIP]
+====
+`@Config` でクラスをマークした場合、Mule アプリケーションの実行時に初期化されたオブジェクトセットが存在し、対象のコネクタに対して要求が実行されることが保証されます。
+====
+
+=== pom.xml での連動関係の追加
+
+では、コーディングを開始しましょう。最近追加した項目を Cookbook サービスから取得できるコネクタを作成します。
+
+最近追加されたレシピをコンシュームするのにどのような種類の認証も必要とされません。そのため、この操作はコネクタの作成方法の学習を開始するには最適な操作になります。
+
+. コネクタで使用できるようにクライアントの連動関係を追加します。これにより、Java API を使用して {tutorial} に接続できます。
++
+pom.xml ファイルに次のコードを追加します。
++
+[source,xml,linenums]
+----
+<dependencies>
+  <dependency>
+    <groupId>org.mule.modules</groupId>
+    <artifactId>sdk-client</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </dependency>
+</dependencies>
+----
+
+=== 設定可能項目をサポートするためのコードの追加
+
+`ConnectorConfig.java` ファイルで、{tutorial} サービスをホストするアドレスに対する @Configurable アノテーションを付加します。
+
+. コネクタ設定用のエディタで​*「conf」*​と入力し、`control` + `space` を使用してテンプレートを表示します。
++
+image::config-field.png[width="600"]
++
+. クライアントの接続先のエンドポイントのデフォルト値 (`+@Default("http://devkit-cookbook.cloudhub.io/soap")+` など) を使用して、`@Configuration` アノテーション付きクラスの設定可能項目を定義します。
+. `@Configurable` アノテーションでマークされた項目には、その項目用の getter と setter が必要です。
++
+https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v1/ConnectorConfig.java[設定] の完全なソースコードを参照してください。
+
+=== クライアントの初期化
+
+`Connector.java` ファイル内の `@Connector` アノテーション付きクラス内で、クライアントを初期化するためのメソッドに対して `@Start` アノテーションを使用します。
+
+[source,java,linenums]
+----
+include::{examplesdir}/java/v1/CookbookConnector.java[lines=30..35]
+----
+
+[NOTE]
+====
+Mule 固有のインターフェースを実装しなくても、Anypoint コネクタは Mule Runtime のライフサイクルを完全に認識するように作成されています。
+
+ライフサイクルの 4 つの各フェーズにアノテーションメソッドがあります。
+
+メソッドにこのいずれかのアノテーションが付加されている場合、DevKit は、そのアノテーションが表すライフサイクルフェーズ中にメソッドを呼び出します。
+====
+
+[[processor]]
+=== @Processor メソッドの追加
+
+. `Connector.java` ファイルからダミーの `@Processor` 操作を削除します。
++
+. プロセッサを追加するには、Studio コードエディタに `proc` と入力して、`ctrl` + `space` を使用してテンプレートを表示し、simple processor (シンプルプロセッサ) を選択します。
++
+image::processor1.png[width="600"]
++
+. `getRecentlyAdded` メソッドの署名を反映するようにこれを変更します (実装例については、&#8203;https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v1/CookbookConnector.java#L46[こちら]を参照)。この時点で、最初のコネクタを作成するためのコードが用意されます。このコネクタをすぐにテストできます。
+. xref:creating-a-java-sdk-based-connector.adoc#generating-sources[[Generate Sources (ソースを生成)]] アクションを実行します。
++
+https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v1/CookbookConnector.java[コネクタ]の完全なソースコードを参照してください。
+
+[NOTE]
+パッケージのインポートエラーを解決するには、Studio の Package Explorer で対象のコネクタプロジェクトを右クリックします。*[Build Path (ビルドパス)]* > *[Add External Archives (外部アーカイブを追加)]* を選択します。適用可能な .jar ファイルなどを追加し、プロジェクトで Cookbook の `sdk-client` を参照できるようにします。これにより、`import com.cookbook.tutorial.client.MuleCookBookClient;` `import com.cookbook.tutorial.service.Recipe;` のインポートエラーが阻止されます。
+
+プロジェクトのプロパティで参照を確認できます。
+
+image::devkit-tutorial-af283.png[Cookbook コネクタプロジェクトのプロパティ]
+
+この時点で、このコネクタを<<install-guide,インストール>>し、必要に応じて Studio でコネクタを試すことができます。
+
+[IMPORTANT]
+====
+コネクタを変更すると、生成されたフォルダにエラーマーカーが表示される場合があります。
+
+これは無視してください。
+
+ソースを再生成すると、生成されたコードが更新されるためエラーは表示されなくなります。
+====
+
+==== コネクタプロセッサのサンプルコードの定義
+
+[NOTE]
+DevKit 3.9 で作成されたコネクタでは、異なる形式のサンプルの仕様がサポートされます。新しい仕様と生成形式については、xref:connector-reference-documentation.adoc[コネクタリファレンスドキュメント]を参照してください。
+
+手順に従って、操作 (`@Processor` のアノテーション付き) の使用サンプルを追加します。
+
+`Connector.java` ファイルの `{@sample ...}` の後のコードブロックで参照されているファイルを作成します (ファイルがまだ存在しない場合)。
+
+----
+/**
+ * Returns the list of recently added recipes
+ *
+ * {@sample.xml ../../../doc/cookbook-connector.xml.sample
+ * cook-book:getRecentlyAdded}
+ *
+ * @return A list of the recently added recipes
+ */
+----
+
+[NOTE]
+サンプルを追加する場合、ファイル内のサンプルを示す名前と同じ名前を使用してください。この内側に `@Processor` のサンプルを配置する必要があります。
+
+「Javadoc check (Javadoc チェック)」を有効にしている場合、DevKit プラグインは欠落しているサンプルをエラーとしてマークし、サンプルを簡単に追加できるようにクイック修正を提供します。
+
+有効にしていない場合、エディタでファイルを開き、​*「<」*​と入力し、`control` + `space` を使用してテンプレートを表示し、操作に最も適したサンプルを選択します。
+
+image::sample1.png[width="600"]
+
+この場合のサンプルは次のようになります。
+
+[source,xml,linenums]
+----
+<!-- BEGIN_INCLUDE(cook-book:getRecentlyAdded) -->
+	<cook-book:get-recently-added/>
+<!-- END_INCLUDE(cook-book:getRecentlyAdded) -->
+----
+
+=== Mule アプリケーションでのコネクタの使用
+
+HTTP エンドポイントでリスンする簡単なアプリケーションを作成します。エンドポイントへのアクセスがあると、アプリケーションはコネクタを使用して、最近追加された項目のリストを Cookbook サービスから取得します。
+
+. Studio で Mule アプリケーションを作成し、HTTP リスナを追加して、パスに `/get-recently` を指定します。これが初めての Mule アプリケーションの場合は、xref:general:getting-started:build-a-hello-world-application.adoc[Hello World アプリケーション]を参照してください。
+. コネクタをキャンバスにドロップし、`admin` と `admin` をログイン情報として使用するように設定します (これは OAuth 以外の設定用です)。
++
+image::devkit-tutorial-4cb84.png[]
++
+. コネクタの後に *[Object to JSON]* トランスフォーマをドラッグアンドドロップし、アプリケーションを実行します。([Play (プレイ)] アイコンまたは *[Run As (別のユーザとして実行)]* > *[Mule Application (Mule アプリケーション)]*)
++
+image::devkit-tutorial-1c0f8.png[]
++
+[source,xml,linenums]
+----
+include::{examplesdir}/mule-app/first-mule-app.xml[]
+----
++
+URL `+http://localhost:8081/get-recently+` にアクセスすると、次のような応答が表示されます。
++
+[source,json,linenums]
+----
+[
+   {
+      "created":1428678371866,
+      "id":2,
+      "lastModified":null,
+      "name":"Baked Apples",
+      "cookTime":20.0,
+      "directions":[
+         "Cut the Apples",
+         "Put them in the oven",
+         "Remove from the oven after 20.0 minutes"
+      ],
+      "ingredients":[
+         {
+            "created":1428678371866,
+            "id":1,
+            "lastModified":null,
+            "name":"Apple",
+            "quantity":0.0,
+            "unit":"UNIT"
+         }
+      ],
+      "prepTime":30.0
+   }
+]
+----
+
+
+コネクタのテストの作成方法については、以下を参照してください。
+
+* http://mulesoft.github.io/connector-certification-docs/advanced/index.html#_functional_tests_automation[テストオートメーション]のドキュメント。
+
+* 完全なxref:developing-devkit-connector-tests.adoc[テストドキュメント]。
+
+=== 接続管理の追加
+
+`getRecentlyAdded` コールでは、認証は不要です。他のすべての Cookbook 操作では、各要求でトークンを設定する必要があります。
+
+使用しているクライアントは、トークンを初期化するログインコールを提供し、後続の要求でそのトークンを使用します。
+
+[NOTE]
+====
+セッションが期限切れになる可能性があり、それによりコネクタがログイン要求を再度実行することを考慮してください。
+====
+
+DevKit は、コードをクリーンの状態に維持し、接続を処理するための一連のアノテーションを提供します。
+
+. `Config.java` ファイル内の `@Configuration` を `@ConnectionManagement` に変更します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v2/ConnectorConfig.java[lines=29]
+----
++
+. `ConnectorConfig.java` の `MuleCookbookClient` に getter および setter が備わっていることを確認します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v2/ConnectorConfig.java[lines=91..100]
+----
++
+. 以下の 4 つのメソッドを示されているとおりに実装します。
++
+* *`@Connect`* - クライアントを初期化し、ログインが成功しない場合に例外をスローします。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v2/ConnectorConfig.java[lines=41..50]
+----
++
+* *`@Disconnect`* - 接続をリリースします。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v2/ConnectorConfig.java[lines=55..58]
+----
++
+* *`@ValidateConnection`* - 接続が動作していることを確認します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v2/ConnectorConfig.java[lines=63..66]
+----
++
+* *`@ConnectionIdentifier`* - 文字列値を返します。これは、デバッグ時のみ使用します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v2/ConnectorConfig.java[lines=71..74]
+----
++
+. `MuleCookBookClient` の宣言を `CookbookConnector.java` から削除し、新しい `MuleCookBookClient` クライアントがインスタンス化されているメソッドを削除します。
++
+[source,java,linenums]
+----
+	private MuleCookBookClient client;
+
+	@Start
+	public void initialize() {
+		client = new MuleCookBookClient(config.getAddress());
+	}
+----
++
+. `getRecentlyAdded` メソッド (`@Processor` のアノテーション付き) で、`getclient` メソッドをコールします。このメソッドは `ConnectorConfig.java` で定義されている必要があります。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v2/CookbookConnector.java[lines=35..38]
+----
+
+情報:
+
+* https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v2/CookbookConnector.java[コネクタ]のソースコード。
+
+* https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v2/ConnectorConfig.java[設定]のソースコード。
+
+このバージョンをインストールし、前に作成した Mule アプリケーションを実行すると、「SAXParseException」で失敗します。設定にユーザ名とパスワードを追加する必要があるためです。
+
+コネクタのグローバル設定を開き、[Username (ユーザ名)] と [Password (パスワード)] の 2 つの新しい項目があることを確認します。これらを設定し、アプリケーションを再度実行します。
+
+image::connection-management.png[width="600"]
+
+以下に、更新された Mule アプリケーションの XML を示します。
+
+[source,xml,linenums]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cookbook="http://www.mulesoft.org/schema/mule/cookbook" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:spring="http://www.springframework.org/schema/beans"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/cookbook http://www.mulesoft.org/schema/mule/cookbook/current/mule-cookbook.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <cookbook:config name="Cookbook__Configuration" doc:name="Cookbook: Configuration type config" password="admin" username="admin"/>
+    <flow name="mule-appFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/get-recently" doc:name="HTTP"/>
+        <cookbook:get-recently-added config-ref="Cookbook__Configuration" doc:name="Cookbook"/>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+    </flow>
+</mule>
+----
+
+* http://mulesoft.github.io/connector-certification-docs/advanced/index.html#_test_connectivity[接続のテスト]について理解してください。
+* DevKit を使用したxref:authentication.adoc[認証]のセットアップに関するドキュメントを参照してください。
+
+== 例外およびエラー処理の向上
+
+このセクションでは、例外処理と再接続を向上する方法について説明します。
+
+=== @Handler を使用した例外処理
+
+`@Handler` 機能は、例外処理のコードの重複を回避するのに役立ち、コードを読みやすくします。
+
+API から取得したメッセージを処理するときに、そのメッセージが役に立たないことがわかり、それを改善する方法がわかっている場合は、`@Handler` メカニズムを使用して、充実したエラーメッセージをユーザに提供します。
+
+このしくみを確認するため、Cookbook SDK `create()` コールによりスローされる `InvalidEntityException` のコネクタコードにハンドラを作成しましょう。
+
+.`MuleCookBookClient.java` の次の `create()` コールは `InvalidEntityException` をスローします。
+[source,java,linenums]
+----
+@Override
+   public CookBookEntity create(CookBookEntity entity) throws InvalidEntityException,
+           SessionExpiredException {
+       Create request = factory.createCreate();
+       request.setEntity(entity);
+       try {
+           return port.create(request, token).getReturn();
+       } catch (InvalidTokenException e) {
+           logger.warn("Should never happen.", e);
+           throw new RuntimeException(e);
+       }
+     }
+----
+
+. メニュー内を右クリックし、Anypoint コネクタコンポーネントの項目に移動するか、*[New (新規)]* > *[Other (その他)]* を選択し、ウィザードで該当のオプションを選択して、新しい *Anypoint コネクタコンポーネント*​を作成します。
++
+image::new-component.png[width="600"]
++
+. パッケージ、コンポーネントの種類、クラス名を選択し、[Finish (完了)] をクリックします。
++
+image::new-component-2.png[width="600"]
++
+. `InvalidEntityException` がスローされた場合のエラーメッセージを改善します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v3/CookbookHandler.java[lines=11..19]
+----
++
+完全な&#8203;https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v3/CookbookHandler.java[ソースコード]を確認してください。
++
+. Ingredient (材料) を作成するための新しいプロセッサを追加し、含めた例外ハンドラがどのように参照されるかを確認します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v3/CookbookConnector.java[lines=59..63]
+----
++
+完全な&#8203;https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v3/CookbookConnector.java[ソースコード]を確認してください。
+
+=== セッションの有効期限の処理
+
+ユーザはセッションの有効期限を処理するためのカスタムコードを Mule アプリケーションに追加する必要はありません。DevKit はこれを手際よく行うメカニズムを提供します。
+
+`@Processor` メソッドに `@ReconnectOn` 例外のアノテーションを付加します。
+
+[source,java,linenums]
+----
+include::{examplesdir}/java/v3/CookbookConnector2.java[lines=60..65]
+----
+
+完全な&#8203;https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v3/CookbookConnector2.java[ソースコード]を確認してください。
+
+Mule アプリケーションでは、Mule アプリケーションでセッションの有効期限の処理ができるように再接続戦略を設定できます。
+
+Cookbook コネクタのグローバル設定ダイアログウィンドウ
+
+image::reconnect.png[width="500"]
+
+生成された、Cookbook コネクタ設定要素の XML は次のようになります。
+[source,xml,linenums]
+----
+<cookbook:config-type doc:name="config" name="config" password="admin" username="admin">
+    <reconnect/>
+</cookbook:config-type>
+----
+
+== DataSense の追加
+
+=== 概要
+
+DataSense では、コネクタが対象リソースの API を判別できるため、Mule アプリケーションを作成する場合に、デザイン時のユーザエクスペリエンスが向上します。
+
+DataSense は省略可能ですが、これを使用すると、コネクタユーザはサービスのエンティティのメタデータを取得できます。
+
+情報:
+
+* xref:adding-datasense.adoc[DataSense の追加]
+
+
+このチュートリアルでは、静的 DataSense モデルを使用します。つまり、エンティティは固定され、事前に認識されており、変更されません。このモデルでサポートされる項目も固定されています。
+
+=== DataSense を使用する
+
+Cookbook で DataSense を使用する手順は、次のとおりです。
+
+. {mule} サービスのエンティティを分析します。エンティティは、CookBookEntity から拡張されたシンプルな Recipe (レシピ) と Ingredient (材料) の 2 つのみです。
+. Anypoint Studio 内で createIngredient 操作がどのように表示されるか、また、createIngredient 操作が他のコンポーネントとどのようにやり取りするかを確認します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v3/CookbookConnector2.java[lines=60..65]
+----
+
+==== 材料の処理
+
+Ingredient (材料) を受け取って、サーバから入力された追加の項目と共に Ingredient (材料) を返すように操作を定義しました。
+
+では、材料を処理しましょう。
+
+. 入力メタデータを調べて、想定される出力が POJO であることと、想定される Ingredient (材料) の項目を確認します。
++
+image::datasense-expected-ingredients.png[width="800"]
++
+. 出力メタデータが予期されていることを確認します。
++
+image::datasense-ingredients.png[width="800"]
++
+. [Transform Message] 要素をコネクタの背後または後にドラッグアンドドロップします。入力/出力構造が自動的に収集されます。
++
+image::datasense-input.png[title="コネクタの出力を受け取る Transform Message", width="800"]
++
+
+DevKit は静的メタデータを自動生成するため、コネクタでメタデータ情報の伝播方法が認識されることが自動的に保証されます。
+
+==== レシピの処理
+
+エンティティは Ingredient (材料) だけではありません。Recipe (レシピ) もあります。そのため、モデルに含まれるエンティティごとに 1 つのメソッドを持つことは望まれません。
+
+CookBookEntity クラスのみと連携するようにコネクタを変更します。
+
+. 操作を作成します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v4/CookbookConnector.java[lines=64..69]
+----
++
+. *@RefOnly* アノテーションを使用して、入力は参照としてのみ指定できること (抽象クラスの処理に関する DevKit の制限のため) を DevKit に指示します。
++
+これが UI とユーザエクスペリエンスにどのように影響するかを確認しましょう。
++
+Studio は入力または出力の種別を判別できなくなりました。
++
+image::ref-only-input.png[title="@RefOnly の場合のコネクタの入力",width="900"]
++
+image::ref-only-output.png[title="抽象クラスの場合のコネクタの出力",width="900"]
+
+次のセクションでは、DataSense 対応のユーザエクスペリエンスを戻します。
+
+create、update、get、および delete 操作を使用するコネクタの完全なソースコードは、&#8203;https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v4/CookbookConnector.java[こちら]を参照してください。
+
+=== MetaDataCategory の実装
+
+@MetaDataCategory を使用して DataSense を実装するには、2 つのステップに実装を分割する必要があります。キーを取得するステップとキーについて説明するステップです。
+
+. Anypoint の [DevKit Component (DevKit コンポーネント)] ウィザードを使用して新しい MetaDataCategory を作成します。
++
+image::new-metadatacategory.png[width="600"]
++
+. Recipe (レシピ) 用と Ingredient (材料) 用の 2 つのキーを取得するように、@MetaDataKeyRetriever のアノテーションが付加されたメソッドを変更します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v5/DataSenseResolver.java[lines=28..37]
+----
++
+. 説明を取得するように、@MetaDataRetriever のアノテーションが付加されたメソッドを変更します。静的モデルを使用しているため、POJO モデルのみを作成できます。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v5/DataSenseResolver.java[lines=48..65]
+----
++
+完全な&#8203;https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v5/DataSenseResolver.java[ソースコード]を確認してください。
+
+これをコネクタで使用するには、ユーザがエンティティを選択できるように @Processor を変更します。
+
+. @Connector クラスに @MetaDataScope アノテーションを付加します。これにより、デフォルトの MetaDataCategory が設定され、ユーザが @MetaDataKeyParam を含む @Processor を選択するたびにそのデフォルトが使用されます。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v5/CookbookConnector.java[lines=35..37]
+----
++
+. 入力と出力について説明するには、*@MetaDataKeyParam* のアノテーションが付加された文字列を追加し、*affects=MetaDataKeyParamAffectsType.BOTH* を追加して、文字列が入力と出力に影響することを指定します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v5/CookbookConnector.java[lines=69..75]
+----
++
+. get 操作で、影響が出力にのみ適用されることを指定する必要があるため、若干の変更を加えます。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v5/CookbookConnector.java[lines=115..121]
+----
++
+. 新しいコネクタが Studio にどのように表示されるかを確認します。エンティティ種別を選択して保存すると、コンボができます。これにより、メタデータが自動的に更新されます。
++
+image::datasense-static.png[width="800"]
++
+これで、{dataWeave} でも、@Connector とやり取りする方法が認識されるようになります。
++
+image::datasense-static2.png[width="800"]
+
+コネクタの完全なソースコードは、&#8203;https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v5/CookbookConnector.java[こちら]を参照してください。
+
+==== 動的 DataSense
+
+前のセクションでは、モデルが静的な場合のシナリオについて説明しました。もっと複雑なシナリオを見てみましょう。
+
+エンティティ定義を動的に取得する方法を提供する API があります。Salesforce、NetSuite はその一例です。
+
+ここでは、エンティティについて説明する操作が Cookbook で提供されているため、代わりにその操作を使用してエンティティと構造を取得しましょう。
+
+. サポートされるエンティティを取得し、後で使用できるキーを生成します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v6/DataSenseResolver.java[lines=39..51]
+----
++
+. 動的に変更できる構造を使用します。これを Mule で行うには、+Map<String,Object>+ をコネクタのパラメータまたは戻り値のデータ型として使用します。
++
+Mule には、エンティティの MetaData の生成に役立つビルダーが用意されています。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v6/DataSenseResolver.java[lines=60..87]
+----
++
+. 完全な https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v6/DataSenseResolver.java[ソースコード] を確認してください。
++
+. @Connector では、Map からエンティティを生成するためのコードを追加し、すべての操作で Map を返すことが必要になりました。なぜこれが重要なのでしょうか? API での一貫性を維持するためです。
++
+新しい Create は次のようになります。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v6/CookbookConnector.java[lines=73..88]
+----
++
+入力がマップになったため、UI のフォームが前とは異なっています。
++
+image::datasense-ui.png[width="900"]
++
+. Mule アプリケーションでは、メタデータを更新できず、コネクタを使用できません。また、ご覧のとおり、POJO ではなくマップ構造があることに注意してください。
++
+image::datasense-map.png[width="900"]
+
+DataSense のテスト方法は、&#8203;http://mulesoft.github.io/connector-certification-docs/advanced/index.html#_testing_metadata[DataSense のテスト]ガイドを参照してください。
+
+// TODO
+// === Adding @Query
+
+== ページネーションの追加
+
+=== ページネーションを実装する
+この機能を表示するには、SDK の searchWithQuery 操作をコールするプロセッサを追加します。
+
+ページ分割操作を使用するには、3 つのことを行う必要があります。
+
+[source,java,linenums]
+----
+include::{examplesdir}/java/v8/CookbookConnector.java[lines=209..216]
+----
+<1> プロセッサに @Paged アノテーションを付加します。
+<2> ProviderAwarePagingDelegate を返します。
+<3> パラメータの 1 つとして PagingConfiguration を受け取ります。
+
+--
+ProviderAwarePagingDelegate を実装する場合、2 つの要素を指定する必要があります。
+
+. 各ページに返すリストの種別。この場合は Map<String,Object>。
+
+. コネクタの種別。
+
+これを作成するには、Anypoint の [DevKit Component (DevKit コンポーネント)] ウィザードを使用して、次の手順を実行します。
+
+. 作成するパッケージを指定します。この例では、*org.mule.cookbook.pagination*。
+
+. ProviderAwarePagingDelegate を作成することを指定します。
+
+. クラス名を「CookbookPagingDelegate」として設定します。
++
+image::pagination-component.png[width="600"]
+
+後は、新しいページ要求を処理するために必要なメソッドを実装するだけです。
+
+完全なソースコードは、&#8203;https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v8/CookbookPagingDelegate.java[CookbookPagingDelegate] を参照してください。
+--
+NOTE: 再接続戦略がある場合、DevKit は自動的に再接続し、ページの取得を再試行します。取得されなかった最後のページを確実に再試行するには、PagingDelegate の状態を処理することが重要です。
+
+情報:
+
+* xref:adding-query-pagination-support.adoc[クエリのページネーションサポートの追加]。
+
+=== Mule アプリケーションでのページネーションの使用
+
+たとえば、paged アノテーション付きのプロセッサの前で foreach を使用できます。
+
+[.ex]
+=====
+[discrete.view]
+=== Mule アプリケーション
+
+image::pagination-example.png[width="600"]
+
+[discrete.view]
+=== XML
+
+[source,xml,linenums]
+----
+include::{examplesdir}/mule-app/pagination-example.xml[]
+----
+=====
+
+[[install-guide]]
+== コネクタのインストール
+
+=== Anypoint DevKit プラグインの使用
+
+基本的にコネクタのインストールは Eclipse プラグインのインストールと同じです。
+
+[[steps-to-install]]
+DevKit プラグインからコネクタをインストールする手順は、次のとおりです。
+
+. Package Explorer でプロジェクト名を右クリックし、*[Anypoint Connector (Anypoint コネクタ)]* > *[Install Or Update (インストールまたは更新)]* をクリックします。
++
+image::install1.png[width="500"]
++
+これにより、DevKit Maven 構築ツールが起動され、&#8203;http://help.eclipse.org/luna/index.jsp?topic=%2Forg.eclipse.pde.doc.user%2Fconcepts%2Fupdate_site.htm[更新サイト]フォルダが生成されます。
++
+ファイルは、AnypointStudio 実行可能ファイルと同じディレクトリに配置されている *dropins* フォルダの下にコピーされ、AnypointStudio を再起動することなくインストールされます。
++
+. Mule アプリケーションでコネクタを使用できるようになりました。
++
+image::install2.png[width="600"]
+
+[TIP]
+====
+コネクタをアンインストールするには、UI からショートカットを使用するか、*dropins* ディレクトリからフォルダを削除して、AnypointStudio を再起動します。
+
+image::uninstall.png[width="400"]
+====
+
+=== UpdateSite.zip からのインストール
+
+コネクタは、DevKit により生成された更新サイトを選択することで、手動でインストールできます。
+
+. コマンドプロンプトまたはターミナルを開き、プロジェクトの pom.xml ファイルが存在する場所 (Eclipse ワークスペース内) にディレクトリを変更します。
+. *mvn clean package* を実行します。これにより、コネクタが作成されます。作成が成功すると、コネクタの「UpdateSite.zip」が生成されたディレクトリが表示されます。通常、これは Studio を指すものです。
+. *[Help (ヘルプ)]* > *[Install New Software... (新規ソフトウェアをインストール...)]* をクリックします。
++
+image::install-updatesite.png[width="600"]
++
+. *[Add (追加)]* をクリックし、新しいダイアログでフォルダを探します。
+. プロジェクトの生成先フォルダの下に生成されている UpdateSite ファイルをクリックします。
++
+image::install-updatesite2.png[width="600"]
++
+UpdateSite.zip という名前の zip ファイルまたはフォルダ update-site を選択できます。
++
+image::install-updatesite3.png[width="600"]
++
+ポップアップが開き、実行されたタスクが表示されます。
+[[install-dialog]]
+image::install12.png[width="500"]
++
+. インストールと更新の項目を確認し、ライセンス契約に同意します。
++
+. *[Finish (完了)]* をクリックし、Studio を再起動すると、変更が認識され、パレットが更新されます。
++
+NOTE: この実行中に JAR ファイルが署名されないため、ポップアップが表示されます。
++
+image::security-warning.png[width="600"]
++
+. Mule アプリケーションでコネクタを使用できるようになりました。
++
+image::install2.png[width="600"]
+
+== コネクタの更新
+
+コネクタを更新するには、コネクタの<<steps-to-install,インストール>>で実行した手順を繰り返します。
+
+AnypointStudio は、更新であることを検出し、対応するアクションを実行します。
+
+== コネクタのデバッグ
+
+コネクタが正常にインストールされたら、Mule アプリケーションでコネクタの使用を開始できます。
+コネクタのソースコードにブレークポイントを追加して、デバッグすることができます。
+コネクタが Community コネクタの場合、インストールしたコネクタにソースコードが自動的に付属します。
+コネクタが Enterprise コネクタの場合、JAR のソースコードを手動で添付する必要があります。
+
+WARNING: コードを正しくデバッグするには、実行している Mule アプリケーションで最新のインストール済みバージョンが使用されていることを考慮に入れてください。このため、変更を加えて Mule アプリケーションをデバッグする必要がある場合は、コネクタを再インストールする必要があります。
+
+テストの実行時にコネクタをデバッグする方法は、Java クラスをデバッグする方法と同様に簡単です。
+
+コネクタのコードにブレークポイントを設定するだけです。
+
+== コネクタの共有
+
+コネクタは Anypoint Studio に「更新サイト」としてインストールできます。
+
+更新サイトを使用して機能を整理し、エクスポートすることで、機能をコンポーネント/パッケージとして Eclipse アプリケーションにインストールできます。
+
+更新サイトを生成することは、それに含まれる機能が (それらの機能のプラグイン部分と共に) インストール可能なフォームにエクスポートされることを意味します。エクスポートされたプラグインと機能は「plug-ins」と「features」の 2 つのフォルダに入れられます。他の 2 つのファイル (「content.xml」と「artifacts.xml」) も生成され、これらには、インストールを容易にする、エクスポートされたファイルのメタデータが含まれます。これらのファイルと「site.xml」がまとめられ、Eclipse 更新サイトが形成されます。他のユーザが更新サイトを使用できるようにするには、このすべてのファイルを共有ディレクトリまたは Web サイトで使用できるようにする必要があります。
+
+コネクタを作成すると、必要なリソースを DevKit が自動的に生成するため、それらを自分で生成する必要はありません。
+
+Anypoint DevKit プラグインを使用して、コネクタを現在の Studio にインストールしたり、コネクタを他のユーザが使用できるように更新サイトとしてエクスポートしたりできます。
+
+
+[[connector-structure]]
+== コネクタ構造
+
+すべてのコンポーネントがどのように関連しているかを確認するため、Hello World コネクタを作成しましょう。
+
+. Anypoint Studio で *[File (ファイル)]* > *[New (新規)]* > *[Anypoint Connector Project (Anypoint コネクタプロジェクト)]* をクリックするか、Package Explorer でプロジェクト名を右クリックして *[New (新規)]* > *[Anypoint Connector Project (Anypoint コネクタプロジェクト)]* をクリックします。
++
+image::new-connector-1.png[width="500"]
++
+. 作成するコネクタ種別を選択します。この場合は、*[SDK Based (SDK ベース)]* を選択します。
++
+image::new0.png[width="500"]
++
+. コネクタの名前を指定して、*[Finish (完了)]* をクリックします。
++
+image::new-connector-2.png[width="500"]
++
+これにより、構造とすべての必須要素 (スケルトンコネクタ、画像、サンプルドキュメントファイル、コネクタの基本テストなど) を含むプロジェクトが生成されます。
++
+image::new-connector-3.png[width="600"]
++
+. 上部バーから *[Window (ウィンドウ)]* > *[Show View (ビューを表示)]* > *[Other (その他)]* をクリックし、リストで DevKit を探して、DevKit ビューを有効にします。
++
+image::enable-view.png[width="300", height="400"]
+
+最初にコネクタはメッセージプロセッサとユーザインターフェース要素で構成されます。ユーザは Anypoint Studio で UI 要素を設定できます。
+
+DevKit を使用すると、コネクタを Studio に容易にインストールできます。Studio にコネクタをインストールしたら、ユーザはそのコネクタを検索して Mule フローにドラッグできます。
+
+インストールするには、Studio の Package Explorer でコネクタの名前を右クリックし、*[Anypoint Connector (Anypoint コネクタ)]* > *[Install or Update (インストールまたは更新)]* をクリックして、指示に従って Studio を再起動します (<<install-guide,インストールのセクション>>を参照)。インストールはコーディング中にいつでも実行できます。開始スケルトンコネクタをインストールすることもできます。
+
+スケルトンコネクタの構造を確認してみましょう。
+
+この画像では、ほとんどのコードが UI 要素にマップしていることを確認できます。
+
+// TODO: Use 2 images of screenshots with the default layout
+
+image::split-1-high.png[caption="Figure 1: ", title="構造と UI の表示", alt="Image1", width="800", "split-1-high.png"]
+
+次の例では、コードが XML および他の UI 要素とどのように一致するかを確認できます。
+
+// TODO: Use 2 images of screenshots with the default layout
+
+image::split-2-high.png[caption="Figure 2: ", title="設定と XML の表示", alt="Image2", width="800", "split2"]
+
+[NOTE]
+====
+`@ConnectionStrategy` アノテーションは非推奨になります。ユーザは代わりに `@Config` を使用する必要があります。
+====
+
+[[configurable]]
+== @Configurable およびパラメータ修飾子
+
+省略可能なパラメータまたは設定可能なパラメータは、必須ではない要素です。そのため、ユーザはその値を指定する必要はありません。
+
+設定可能な項目は、[Connector Configuration (コネクタ設定)] クラス内で (`@Configurable` を使用して) 指定するか、`@Connector` クラス内で `@Processor` メソッドのパラメータとして指定できます。
+
+[source,java,linenums]
+----
+import org.mule.api.annotations.Configurable;
+import org.mule.api.annotations.Processor;
+import org.mule.api.annotations.param.Optional;
+
+//Inside the Configuration class
+
+/**
+ * Optional Field documentation
+ */
+@Configurable
+@Optional
+private String  optionalField;
+//Getter and Setter of the field are required
+
+//Inside your @Connector
+
+/**
+ * Optional parameter
+ */
+@Processor
+public String sayHi(String firstName,@Optional String lastName ) {
+    return "Hi "+firstName+" "+((lastName==null) ? "":lastName);
+}
+----
+
+== @Default
+
+省略可能なパラメータまたは設定可能なパラメータが必要な場合、`@Optional` を使用せずに `@Default` アノテーションのみを使用できます。
+
+[source,java,linenums]
+----
+import org.mule.api.annotations.Configurable;
+import org.mule.api.annotations.Processor;
+import org.mule.api.annotations.param.Default;
+
+//Inside the Configuration class
+
+/**
+ *  Field with Default
+ */
+@Configurable
+@Default("Hi")
+private String  greeting;
+//Getter and Setter of the field are required
+
+//Inside your @Connector
+
+/**
+ * Default parameter
+ */
+@Processor
+public String sayHi(String firstName,@Default("Unknown") String lastName ) {
+    return greeting+" "+firstName+" "+lastName;
+}
+----
+
+`@Default` アノテーションのもう 1 つの非常に重要な使用方法は、DataSense を含むコネクタを作成する場合です。
+
+== OAuthV2 の追加
+
+サーバはログイン要求を実行する代わりに OAuth 2.0 を使用してトークンを提供することもできます。
+
+戦略に `@OAuth2` アノテーションを付加するだけで、コネクタで OAuth を使用できます。
+
+OAuth2 設定のみがある場合、`Config.java` は次のようになります。
+
+[source,java,linenums]
+----
+include::{examplesdir}/java/v9/OAuth2StandAloneConfig.java[]
+----
+
+@Source でも、すべての操作を @OAuthProtected でマークすることが必要になりました。
+
+たとえば、コネクタのコードは次のようになります。
+[source,java,linenums]
+----
+include::{examplesdir}/java/v9/CookbookConnector.java[lines="113..129"]
+----
+
+https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v9/CookbookConnector.java[完全なソース]コードを確認してください。
+
+情報:
+
+* xref:authentication.adoc[認証]に関するドキュメント。
+* xref:oauth-v2.adoc[OAuth V2]。
+* <<mutiple-connection-strategies,複数の接続戦略のサポート>>。
+
+[[mutiple-connection-strategies]]
+
+== 複数の設定
+
+複数の接続設定が必要な場合、次の 2 つの考慮事項があります。
+
+* すべての設定で同じインターフェースを実装するか、共通の親クラスを使用する必要がある。
+* コネクタの [Config (設定)] 項目をインターフェースとして宣言するか共通の親クラスとして宣言する必要がある。
+
+設定に共通の項目がある場合、それらを親クラスで定義できます。
+
+コネクタでは、リファクタリングの後、クラスは次のようになります。
+
+image::model.png[uml-model]
+////
+[plantuml,model,png]
+----
+title Multiple Configurations
+
+ConnectorConfig <|-- ConnectionManagementConfig
+ConnectorConfig <|-- OAuthConfig
+CookBookConnector *- ConnectorConfig : config
+
+
+abstract class ConnectorConfig {
+- MuleCookBookClient client
+- String endpoint
+}
+
+class CookBookConnector {
+
+}
+
+class ConnectionManagementConfig {
+}
+
+class OAuthConfig {
+-String consumerKey
+-String consumerSecret
+-String accessToken
+}
+----
+////
+
+情報:
+
+* https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v9/CookbookConnector.java[コネクタ]のソースコード。
+
+* https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v9/ConnectorConfig.java[基本設定]のソースコード。
+
+* https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v9/ConnectionManagementConfig.java[接続管理設定]のソースコード。
+
+* https://github.com/mulesoft/mule-cookbook-tutorial/blob/master/src/main/asciidoc/resources/java/v9/OAuthConfig.java[OAuth2 設定]のソースコード。
+
+== @Source の追加
+
+=== ソースとは?
+場合によって、メッセージプロセッサではなくメッセージソースの作成が必要になることがあります。
+
+基本的に、メッセージソースでは、Mule により処理される新しいメッセージを受信または生成します。
+メッセージソースのユースケースの 1 つとして、ストリーミング API の実装があります。`@Source` アノテーションでは、`@Connector` アノテーション付きクラス内のメソッドが、Mule フローからのコールが可能、および Mule イベントの生成が可能としてマークされます。マークされた各メソッドでメッセージソースが生成されます。メソッドは、その引数の 1 つとして、チェーン内の次のメッセージプロセッサを表す SourceCallback を受け取る必要があります。このパラメータがメソッドの署名に存在する限り、このパラメータの順序は重要ではありません。
+
+== メッセージソースの実装
+
+例として、GetRecentlyAdded メソッドを使用します。
+
+. `@Connector` の内側で「source」と入力し、Ctrl + Space バーを使用してテンプレートを表示します。
++
+image::source-template.png[width="600"]
+
+. コールバックを使用してコネクタでの最近の更新の取得をコンシュームする `@Source` を作成します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v7/CookbookConnector.java[lines=73..90]
+----
+
+. この新しいバージョンをインストールします。
+
+. フローで [Cookbook] コネクタをドラッグアンドドロップするだけで、フローの生成中に自動的に表示されるようになります。
++
+image::source-example.png[width="600"]
+
+. ロガーを追加し、デバッグして、ペイロードにレシピが含まれるようになったことを確認します。
++
+[.ex]
+=====
+[discrete.view]
+=== Mule アプリケーション
+
+image::source-debug.png[width="600"]
+
+[discrete.view]
+=== XML
+
+[source,xml,linenums]
+----
+include::{examplesdir}/mule-app/source-example.xml[]
+----
+=====
+
+== トランスフォーマの追加について
+
+トランスフォーマは、メッセージペイロードを、宛先で期待される形式に変換します。Mule ESB は多くの標準トランスフォーマを提供します。ユーザは Mule XML 設定ファイル内で要素と属性を使用してそのトランスフォーマを設定できます。
+
+独自のカスタムトランスフォーマを作成すると便利な場合があります。
+
+メソッドに @Transformer のアノテーションを付加すると、メソッドの機能をトランスフォーマとしてエクスポートすることが DevKit に通知されます。@Module または @Connector のアノテーションが付加されたクラスでトランスフォーマを宣言する必要があり、1 つのクラスで複数のトランスフォーマを宣言できます。トランスフォーマ、メッセージプロセッサ、メッセージソースのすべてを同じクラスで宣言できます。
+
+`@Transformer` アノテーション付きメソッドの要件を以下に示します。
+
+* 静的である
+* 公開である
+* void を返さない
+* java.lang.Object を返さない
+* 1 つの引数のみを受け取る
+* `@Connector` のアノテーションが付加されたクラス内にある
+
+=== トランスフォーマの作成
+
+ここでは、+List<Recipe>+ を +List<Map<String,Object>>+ に変換するトランスフォーマを作成します。この方法では、既存の操作を変更する必要はなく、その出力を、+List<Map<String,Object>>+ を受け取る操作で引き続き使用できます。
+
+[source,java,linenums]
+----
+include::{examplesdir}/java/v6/CookbookConnector.java[lines=163..169]
+----
+
+=== Mule アプリケーションでのトランスフォーマの使用
+
+トランスフォーマを使用するには、パレットからトランスフォーマをドラッグアンドドロップし、フローを作成します。
+
+* ここでは、トランスフォーマを明示的に使用して、レシピをマップに変換しています。
++
+[.ex]
+=====
+[discrete.view]
+=== Mule アプリケーション
+
+image::transformer-explicit.png[width="600"]
+
+[discrete.view]
+=== XML
+
+[source,xml,linenums]
+----
+include::{examplesdir}/mule-app/transformer-example.xml[]
+----
+=====
+
+* 種別を解決するためのトランスフォーマが 1 つのみの場合は、トランスフォーマを暗黙的に使用することもできます。
+
+. Recipe (レシピ) オブジェクトを Map<String,Object> に変換できる別のトランスフォーマを定義します。
++
+[source,java,linenums]
+----
+include::{examplesdir}/java/v8/CookbookConnector.java[lines=226..232]
+----
++
+. コネクタをインストールします。
++
+. Mule アプリケーションで、リストの最初の項目を取得し、その後に update 操作を追加するフローを作成します。トランスフォーマを使用しないでください。
++
+[.ex]
+=====
+[discrete.view]
+=== Mule アプリケーション
+
+image::transformer-implicitly.png[width="600"]
+
+[discrete.view]
+=== XML
+
+[source,xml,linenums]
+----
+include::{examplesdir}/mule-app/transformer2-example.xml[]
+----
+=====
+
+. 例を実行し、フローが正常に実行することを確認します。
+
+== @Password の使用
+
+@`@Password` パラメータで `Connect` を使用すると、マスクされた入力項目が UI に生成されます。
+
+[source,java,linenums]
+----
+include::{examplesdir}/java/v2/ConnectorConfig.java[lines=41..43]
+----
+
+Studio では、これは次のような設定になります。
+
+image::password.png[width="500"]
+
+// ==== Using @Placement
+
+// Defines the placement of a configurable attribute in the Anypoint Studio configuration.
+
+//TODO
+
+== API 用のコネクタの作成
+
+API はいくつかの方法で公開されます。API の使用を開始するには、コネクタ内で API を使用する前にいくつかの項目をセットアップする必要があります。
+
+=== SDK クライアント
+
+SDK がある場合、jar 用の Maven 連動関係を pom.xml に含めるだけで済みます。
+
+たとえば、Cookbook 用の SDK をコンシュームするには、その連動関係を追加することができます。
+
+[source,xml,linenums]
+----
+<dependencies>
+  <dependency>
+    <groupId>foo.sdk.group.id</groupId>
+    <artifactId>foo.sdk.artifact.id</artifactId>
+    <version>${sdk.version}</version>
+  </dependency>
+</dependencies>
+----
+
+=== SOAP API
+
+wsdl がある場合、コネクタを作成するための最も簡単な方法は、CXF http://cxf.apache.org/docs/wsdl-to-java.html[wsdl2java] を使用してクライアントを作成することです。
+
+CXF の目標を `pom.xml` ファイルで非常に簡単に設定できます。詳細なドキュメントは Apache の http://cxf.apache.org/docs/maven-cxf-codegen-plugin-wsdl-to-java.html[CXF サイト]を参照してください。
+
+たとえば、`pom.xml` ファイルに次のコードとすべての必須の連動関係を追加できます。
+[source,xml,linenums]
+----
+<build>
+  <plugins>
+    <!-- CXF Code generation -->
+    <plugin>
+      <groupId>org.apache.cxf</groupId>
+      <artifactId>cxf-codegen-plugin</artifactId>
+      <version>${cxf.version}</version>
+      <executions>
+        <execution>
+          <phase>clean</phase> <!-- This is required for it to work with DevKit -->
+          <goals>
+            <goal>wsdl2java</goal>
+          </goals>
+          <configuration>
+            <wsdlOptions>
+              <wsdlOption>
+                <wsdl>${basedir}/src/main/resources/wsdl/IMuleCookBookService.wsdl</wsdl>
+                <autoNameResolution>true</autoNameResolution>
+                <extendedSoapHeaders>false</extendedSoapHeaders>
+                <extraargs>
+                  <extraarg>-xjc-Xbg</extraarg>
+                   <extraarg>-xjc-Xcollection-setter-injector</extraarg>
+                  <extraarg>-p</extraarg>
+                  <extraarg>org.mule.modules.wsdl.api</extraarg>
+                </extraargs>
+              </wsdlOption>
+            </wsdlOptions>
+          </configuration>
+         </execution>
+      </executions>
+      <dependencies>
+        <!-- Boolean Getters -->
+        <dependency>
+          <groupId>org.apache.cxf.xjcplugins</groupId>
+          <artifactId>cxf-xjc-boolean</artifactId>
+          <version>${cxf.version.boolean}</version>
+        </dependency>
+        <!-- Collection Setters -->
+        <dependency>
+          <groupId>net.java.dev.vcc.thirdparty</groupId>
+          <artifactId>collection-setter-injector</artifactId>
+          <version>0.5.0-1</version>
+        </dependency>
+      </dependencies>
+    </plugin>
+  </plugins>
+</build>
+----
+
+DevKit プラグインを使用すると、開始するために必要なすべてのものが自動的に生成されます。必要なことは、コンピュータ上の WSDL の場所を指定することのみです。
+
+=== REST API
+
+HTTP 要求を実行するのに役立つ任意のライブラリを使用して、要求を作成します。
+
+Mule バージョン 3.6.0 以降で提供される Jersey 2.11 を使用することをお勧めします。
+
+常に適切なバージョンを使用するには、次の連動関係をコネクタの `pom.xml` に追加します。
+
+[source,xml,linenums]
+----
+<dependencies>
+    <dependency>
+        <groupId>org.mule.modules</groupId>
+        <artifactId>mule-module-jersey</artifactId>
+        <version>${mule.version}</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+----
+
+GET 要求の例:
+
+[source,java,linenums]
+----
+ClientConfig clientConfig = new ClientConfig();
+Client client = ClientBuilder.newClient(clientConfig);
+WebTarget webTarget = client.target("http://example.com/rest"); // # <1>
+WebTarget resourceWebTarget = webTarget.path("resource");
+WebTarget helloworldWebTarget = resourceWebTarget.path("helloworld"); // # <2>
+WebTarget helloworldWebTargetWithQueryParam =
+        helloworldWebTarget.queryParam("greeting", "Hi World!"); // # <3>
+
+Invocation.Builder invocationBuilder =
+        helloworldWebTargetWithQueryParam.request(MediaType.APPLICATION_JSON_TYPE); // # <4>
+
+Response response = invocationBuilder.get(); // # <5>
+System.out.println(response.getStatus());
+System.out.println(response.readEntity(String.class));
+----
+<1> クライアントで URL `+http://example.com/rest+` に対して要求を実行する準備ができました。
+<2> `+http://example.com/rest/resource/helloworld+` のパスを追加します。
+<3> クエリパラメータを設定します。クエリパラメータは `+http://example.com/rest/resource/helloworld?greeting=Hi+World%21+` のようになります。
+<4> JSON 形式の応答が必要であることを指定します。
+<5> GET 要求を実行します。
+
+=== Cookbook 用の REST サーバ
+
+Cookbook REST サーバに含まれる 3 つのリソースをテストする場合、SDK に基づくようにコネクタをセットアップし、認証メカニズムとして OAuth v2 を選択します。
+
+詳細は、&#8203;http://repo1.maven.org/maven2/com/sun/jersey/jersey-documentation/1.6/jersey-documentation-1.6-user-guide.pdf[Jersey クライアント]に関するドキュメントを参照してください。

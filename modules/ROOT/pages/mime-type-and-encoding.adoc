@@ -1,0 +1,46 @@
+= MIME タイプおよび文字コード
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, mime, processor
+
+Mule 3.7 以降では、@Processor からの特定の戻り値オブジェクトの MIME タイプおよびエンコードを定義できます。アノテーションについての詳細は、&#8203;http://mulesoft.github.io/mule-devkit/[「Anypoint DevKit API Reference (Anypoint DevKit API リファレンス)」]を参照してください。
+
+DevKit には、要素がコンパイル時にその情報を取得する @Mime アノテーションがありますが、コネクタが API のファイルシステムタイプに対するプロキシまたはラッピングを実装する場合には役に立ちません。
+
+== ランタイムサポート
+
+この機能により、戻り値のデータ型をカスタマイズできます。次の例は、この機能をトリガする方法を示しています。
+
+[source,text,linenums]
+----
+@Processor
+@UserDefinedMetaData
+----
+
+== Anypoint Studio サポート
+
+@Processor に @UserDefinedMetaData アノテーションが付加されている場合 (TransformingValue を使用する場合は必須ではない)、その属性は、Studio ユーザが必要に応じて後で使用するときに特定のプロセッサのメタデータを変更するのに便利です。
+
+有効にすると、Studio のエンドユーザには *[Metadata (メタデータ)]* タブが Studio に表示され、ユーザは以下で示しているようにメタデータの伝播の情報を変更できます。
+
+コード例:
+
+[source,java,linenums]
+----
+...
+import org.mule.api.annotations.display.UserDefinedMetaData;
+...
+@Connector(name = "file-chooser", friendlyName="File Chooser")
+public class FileChooserConnector {
+    @Config
+    ConnectorConnectionStrategy connectionStrategy;
+    @Processor(friendlyName="Open File as InputStream")
+    @UserDefinedMetaData
+    public TransformingValue<InputStream,DataType<InputStream>> openFileAsIS(
+    ...
+----
+
+[Metadata (メタデータ)] タブ:
+
+image::metadatatab.png[MetadataTab]

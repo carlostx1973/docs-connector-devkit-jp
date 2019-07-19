@@ -1,0 +1,145 @@
+= メッセージプロセッサの作成
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+
+Mule の主要概念の 1 つにメッセージプロセッサがあります。@ アノテーションをコードに追加すると、Mule はそれを使用して Java メソッドを指定します。メッセージプロセッサは属性を解釈します。  アノテーションの機能については、&#8203;http://en.wikipedia.org/wiki/Java_annotation[Java アノテーション]についての説明を参照してください。
+
+たとえば、`@Processor` アノテーションはアノテーションプロセッサと連携し、メッセージプロセッサとしてコンシュームするメソッドを示します。
+
+簡単な例:
+
+[source,java,linenums]
+----
+@Connector(name = "myextension", friendlyName="MyExtension Class")
+public class MyExtension {
+
+  @Processor
+  public void myMethod(String taskToComplete, String startDate, int taskIdNumber) {
+     // code here
+  }
+----
+
+この例では、@Processor 属性は、@Connector 属性により宣言された MyExtension クラスの myMethod を示します。
+
+Mule は myMethod メソッドを次のように呼び出します。DevKit では MyMethod() が my-method に変換されます。
+
+[source,xml,linenums]
+----
+<myextension:my-Method />
+----
+
+== @Processor アノテーション
+
+Mule で呼び出す公開インスタンスメソッドを指定します。このメソッドは任意の数と種別の引数を受け取り、任意の戻り値のデータ型を持つことができます。
+
+[%header,cols="20a,80a"]
+|===
+|パラメータ |説明
+|*name (名前)* |*省略可能*。このプロセッサを呼び出す要素の XML 名。指定しない場合、名前はメソッドの名前から派生します。
+|*friendlyName* |*必須*。Studio 内のコネクタ操作ドロップダウンのグローバル要素ドロップダウンのすぐ下に表示される名前。
+|*インターセプト* a|
+*省略可能*。この値を true に設定すると、次のように表現されるインターセプトメッセージプロセッサの生成がトリガされます。
+
+`{@link org.mule.api.processor.InterceptingMessageProcessor}`
+
+インターセプトメッセージプロセッサは、以下を受け取って、チェーンの次の部分をトリガする必要があります。
+
+`{@link org.mule.api.callback.SourceCallback}`
+
+インターセプトを false に設定した場合、この値により、次のように表現されるメッセージプロセッサが生成されます。
+
+`{@link org.mule.api.processor.MessageProcessor}`
+
+|===
+
+=== @Optional
+
+Mule からメソッドを呼び出すときにメソッドパラメータの値が必須ではないことを指定します。
+
+例:
+
+[source,java,linenums]
+----
+@Connector(name = "optional", friendlyName="OptionalConnector Class")
+public class OptionalConnector {
+  @Processor
+  public double division(int sum1, int sum2, @Optional int divisor) {
+      return (sum1 + sum2) / divisor;
+  }
+----
+
+25 ((40+10) / 2) を返す除数パラメータを指定します。
+
+[source,xml,linenums]
+----
+<optional:division sum1="40" sum2="10" divisor="2"/>
+----
+
+`divisor` パラメータは必須ではないため、次を実行すると、ゼロ除算が実行され (ゼロは int データ型のデフォルト値)、例外が発生します。
+
+[source,xml,linenums]
+----
+<optional:division sum1="40" sum2="10"/>
+----
+
+=== @Default
+
+値が明示的に設定されていない場合のパラメータのデフォルト値を指定します。次に例を示します。
+
+[source,java,linenums]
+----
+@Connector(name="optional", friendlyName="OptionalConnector Class")
+public class OptionalConnector {
+    @Processor
+    public double division(int sum1, int sum2, @Optional @Default("1") int divisor) {
+        return (sum1 + sum2) / divisor;
+    }
+----
+
+除数パラメータのデフォルト値は 1 のため、次のコードは正常に実行され、ペイロードは 50 に設定されます。
+
+[source,xml,linenums]
+----
+<optional:division sum1="40" sum2="10"/>
+----
+
+ベストプラクティスとして除数の値を指定することをお勧めします、これにより、コードがわかりやすく、維持しやすくなります。次に例を示します。
+
+[source,xml,linenums]
+----
+<optional:division sum1="40" sum2="10" divisor="1"/>
+----
+
+このどちらの形式でも、ペイロードは 50 に設定されます。
+
+== インターセプトメッセージプロセッサ
+
+インターセプトメッセージプロセッサは、別のリスナのメッセージプロセッサをインターセプトする Mule イベントを処理します。インターセプトメッセージプロセッサでは、処理を続行する必要があるかどうか、つまり Mule がチェーン内の次のメッセージプロセッサを呼び出す必要があるかどうかが決定されます。
+
+`intercepting` パラメータを true に設定した場合、メソッドには `org.mule.api.callback.SourceCallback` 種別のパラメータが必要です。
+
+例:
+
+[source,java,linenums]
+----
+Processor(intercepting = true)
+  public Object shouldContinue(SourceCallback afterChain, ...) throws Exception {
+    if (...) {
+        return afterChain.process();
+    }
+
+    ...
+  }
+----
+
+== 制限
+
+`@Processor` のアノテーション付きのメソッドには、次の制限があります。
+
+* 静的にできない
+* public 以外にできない
+* パラメータに単語 `name` の名前を付けることができない
+* オーバーロード状態にできない
+
+*注意*: Mule には、使用できない予約済みの名前があり、これを使用すると、コネクタの作成時にエラーが発生します。そのうちの 1 つに「name」があります。DevKit には、シナリオに応じて、予約済みの名前が異なる可能性もあります。たとえば、Mule ライフサイクルインターフェース (`initialise, start, stop` および `dispose`) を使用して @Processor ステートメントに名前を付けることはできません。DevKit では、エラーになる名前と名前の変方法が示されます。

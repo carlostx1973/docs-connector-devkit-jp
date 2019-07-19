@@ -1,0 +1,731 @@
+= SOAP コネクタの作成
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, soap, コネクタ, Maven
+
+*[SOAP Connect]* ウィザードでは、XML 要素を受信し、同様に XML 要素で応答する WSDL ベースのコネクタを生成します。この種類のコネクタは Mule バージョン 3.7 以降でのみ動作します。
+
+== SOAP プロジェクトを作成する
+
+. xref:setting-up-your-dev-environment.adoc[Anypoint Studio に DevKit プラグイン]をインストールします。
+. Anypoint Studio で *[File (ファイル)]* > *[New (新規)]* > *[Anypoint Connector Project (Anypoint コネクタプロジェクト)]* をクリックするか、Package Explorer でプロジェクト名を右クリックして *[New (新規)]* > *[Anypoint Connector Project (Anypoint コネクタプロジェクト)]* をクリックします。
++
+image::newconnproj.png[NewConnProj]
++
+. Studio に Maven が登録されていない場合は、次の画面が表示されます。Maven ディレクトリの場所を参照し、&#8203;https://maven.apache.org/download.cgi[Maven] をインストールした場所を探して、*[Test Maven Configuration (Maven 設定をテスト)]* をクリックします。
++
+image::mavenconfiguration.png[MavenConfiguration]
++
+. 作成するコネクタプロジェクト種別を選択します。この場合は、*[SOAP Connect]* を選択します。
++
+image::soapconnect.png[SOAPConnect]
++
+. コネクタの名前を指定して、*[Add WSDL (WSDL を追加)]* をクリックします。
++
+image::connectorandwsdl.png[ConnectorAndWSDL]
++
+. WSDL をファイルまたはフォルダのどちらから取得するかを選択します。この場所はコンピュータまたは URL 上にあります。*`...`* をクリックし、コンピュータ上の WSDL の場所を参照します。*注意*: フォルダを選択した場合、すべての WSDL がそのフォルダに読み込まれます。ファイルまたはフォルダを指定したら、*[OK]* をクリックします。
++
+image::selectwsdllocation.png[SelectWSDLLocation]
++
+. 別の WSDL を追加するには、*[Add WSDL (WSDL を追加)]* をクリックします。WSDL の追加が完了したら、*[Finish (完了)]* をクリックします。WSDL は、指定した順序で評価されます。Studio は WSDL を集約し、コネクタを作成します。
++
+. 必要に応じて、コネクタにコードを追加します。
+. Mule プロジェクトでコネクタをテストする準備が整ったら、*[Anypoint Connector (Anypoint コネクタ)]* > **[Install or Update (インストールまたは更新)]** をクリックします。**注意:** コネクタを作成したらすぐにコネクタをテストできます。
++
+image::connectorinstallupdate.png[ConnectorInstallUpdate]
++
+. コネクタをインストールしたら、*[File (ファイル)]* > *[New (新規)]* > *[Mule Project (Mule プロジェクト)]* をクリックして、コネクタを使用するテストプロジェクトを作成できます。
+. キャンバスの左下にある *[Message Flow (メッセージフロー)]* をクリックし、​*「http」*​を検索して、HTTP コネクタをキャンバスにドラッグします。
+. HTTP コネクタをクリックし、*[Connector Configuration (コネクタ設定)]* 項目にある緑色のプラス記号をクリックします。新しい [HTTP Listener Configuration (HTTP リスナの設定)] ウィンドウで *[OK]* をクリックし、デフォルト設定を受け入れます。
+. *「sunset」*​を検索し、SunsetRise コネクタをキャンバスにドラッグします。
++
+image::sunsetriseconnector.png[SunsetRiseConnector]
++
+. *[SunsetRise]* コネクタアイコンをクリックし、項目を設定します。*[Connector Configuration (コネクタ設定)]* 項目にある緑色のプラス記号をクリックします。
+
+*注意:* SOAP Connect は、RCP でエンコードされた WSDL またはマルチパートメッセージをサポートしません。
+
+== SOAP コネクタのデフォルトコードの例
+
+SOAP コネクタを作成したら、次のクラスが作成されます。
+
+* @Connector クラス (*src/main/java* > *org.mule.modules*._<connector_name>_)。このクラスには、@Config アノテーションと、*getConfig*() および *setConfig*() のメソッドが含まれます。
+* @WsdlProvider クラス (**src/main/java** > *org.mule.modules*._<connector_name>_.*config*)。このクラスには、@WsdlServiceRetriever と @WsdlServiceEndpoint のアノテーションが含まれます。検索アノテーションでは WSDL ファイルの完全セットを取得します。サービスエンドポイントアノテーションでは、1 つ以上の WSDL でエンドポイントを解決する方法が提供されます。
+
+=== @Connector クラスのデフォルトコード例
+
+[source,java,linenums]
+----
+package org.mule.modules.sunsetrise;
+
+import org.mule.api.annotations.Config;
+import org.mule.api.annotations.Connector;
+import org.mule.modules.sunsetrise.config.ConnectorConfig;
+
+@Connector(name="sunset-rise", friendlyName="SunsetRise", minMuleVersion = "3.7")
+public class SunsetRiseConnector {
+    @Config
+    ConnectorConfig config;
+
+    public ConnectorConfig getConfig() {
+        return config;
+    }
+
+    public void setConfig(ConnectorConfig config) {
+        this.config = config;
+    }
+}
+----
+
+=== @WsdlProvider クラスのデフォルトコード例
+
+[source,java,linenums]
+----
+package org.mule.modules.sunsetrise.config;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.mule.api.annotations.components.WsdlProvider;
+import org.mule.api.annotations.ws.WsdlServiceEndpoint;
+import org.mule.api.annotations.ws.WsdlServiceRetriever;
+import org.mule.devkit.api.ws.definition.DefaultServiceDefinition;
+import org.mule.devkit.api.ws.definition.ServiceDefinition;
+
+@WsdlProvider(friendlyName = "Configuration")
+public class ConnectorConfig {
+    @WsdlServiceRetriever
+
+    public List<ServiceDefinition> getServiceDefinitions() {
+
+        final List<ServiceDefinition> serviceDefinitions = new ArrayList<ServiceDefinition>();
+
+        serviceDefinitions.add(new DefaultServiceDefinition(
+                "SunSetRiseService_SunSetRiseServiceSoap",
+                "sunsetriseservice (SunSetRiseServiceSoap)",
+                "wsdl/sunsetriseservice.wsdl",
+                "SunSetRiseService",
+                "SunSetRiseServiceSoap"));
+        serviceDefinitions.add(new DefaultServiceDefinition(
+                "SunSetRiseService_SunSetRiseServiceSoap12",
+                "sunsetriseservice (SunSetRiseServiceSoap12)",
+                "wsdl/sunsetriseservice.wsdl",
+                "SunSetRiseService",
+                "SunSetRiseServiceSoap12"));
+        serviceDefinitions.add(new DefaultServiceDefinition(
+                "SunSetRiseService_SunSetRiseServiceHttpPost",
+                "sunsetriseservice (SunSetRiseServiceHttpPost)",
+                "wsdl/sunsetriseservice.wsdl",
+                "SunSetRiseService",
+                "SunSetRiseServiceHttpPost"));
+        serviceDefinitions.add(new DefaultServiceDefinition(
+                "SunSetRiseService_SunSetRiseServiceHttpGet",
+                "sunsetriseservice (SunSetRiseServiceHttpGet)",
+                "wsdl/sunsetriseservice.wsdl",
+                "SunSetRiseService",
+                "SunSetRiseServiceHttpGet"));
+        return serviceDefinitions;
+    }
+    @WsdlServiceEndpoint
+    public String getServiceEndpoint(ServiceDefinition definition) {
+        String result;
+        final String id = definition.getId();
+        switch(id){
+                case "SunSetRiseService_SunSetRiseServiceSoap": {
+                result = "http://www.webservicex.net/sunsetriseservice.asmx";
+                break;
+            }
+                case "SunSetRiseService_SunSetRiseServiceSoap12": {
+                result = "http://www.webservicex.net/sunsetriseservice.asmx";
+                break;
+            }
+                case "SunSetRiseService_SunSetRiseServiceHttpPost": {
+                result = "http://www.webservicex.net/sunsetriseservice.asmx";
+                break;
+            }
+                case "SunSetRiseService_SunSetRiseServiceHttpGet": {
+                result = "http://www.webservicex.net/sunsetriseservice.asmx";
+                break;
+            }
+                default: {
+                throw new IllegalArgumentException(id + " endpoint could not be resolved.");
+            }
+        }
+        return result;
+    }
+
+}
+----
+
+== @WsdlProvider を使用したコーディング
+
+このセクションでは、SOAP コネクタで @WsdlProvider を使用する方法についての詳細を説明します。
+
+トピック:
+
+* <<Mandatory Annotations Within @WsdlProvider>>
+* <<Optional Attributes and Annotations Within @WsdlServiceRetriever>>
+* <<Specifying Multiple WSDL Providers>>
+* <<Multiple Level DataSense for WSDL Provider>>
+
+=== @WsdlProvider 内の必須のアノテーション
+
+@WsdlProvider アノテーション内に @WsdlServiceRetriever と @WsdlServiceEndpoint の 2 つのアノテーションを記述する必要があります。
+
+次のサンプルは @Connector クラスのコーディング方法を示しています。
+
+[source,java,linenums]
+----
+@Connector(name="tshirt", friendlyName="T-Shirt")
+public class WsdlConnector {
+    @Config
+    private TShirtWSDLProvider wsdlProvider;
+    //setters and getters
+}
+----
+
+@WSDLProvider 戦略では、一連の WSDL ファイルの抽象化を提供するメソッドを追加し、2 番目のメソッドでアドレスを解決します。
+
+[source,java,linenums]
+----
+@WsdlProvider(friendlyName = "Tshirt configuration")
+public class TShirtWSDLProvider {
+    @WsdlServiceRetriever //[MANDATORY], represents (a)
+    public List<ServiceDefinition> getDefinitions() { // Match exact signature
+        List<ServiceDefinition> serviceDefinitions = new ArrayList<ServiceDefinition>();
+        serviceDefinitions.add(new DefaultServiceDefinition("Tshirt_ID","T-Shirt","tshirt.wsdl",null, null));
+        //other valid ServiceDefinition could be
+        //  serviceDefinitions.add(new DefaultServiceDefinition("Tshirt_ID","T-Shirt",new URL("http://..."),null, null));
+        serviceDefinitions.add(new ...);
+        return serviceDefinitions;
+    }
+
+    @WsdlServiceEndpoint //[MANDATORY], represents (b)
+    public String resolveAddress(ServiceDefinition serviceDefinition){ // Match exact signature
+        StringBuilder sb = new StringBuilder();
+        sb.append("http://myinstance.tshirt.com/incident.do?WSDL")
+                .append("/service=").append(serviceDefinition.getService().get())
+                .append("/v23.0");
+        return sb.toString();
+    }
+}
+----
+
+@WsdlServiceRetriever アノテーションでは、WSDL ファイルの完全セットを取得します。@WsdlServiceEndpoint では、サービスアドレスを解決し、同じエンドポイントに達しない WSDL ファイルのリストを返します。
+
+=== @WsdlServiceRetriever 内の省略可能な属性とアノテーション
+
+以下の例では、このコネクタの世代は Tshirt_ID#OrderTshirt、Tshirt_ID#ListInventory、および Tshirt_ID#TrackOrder の 3 種類のキーを持ちます。何らかの理由で、特定の SOAP API ドメインで「#」区切り文字を使用できない場合 (たとえば、「#」が有効な文字列名である場合)、@WsdlServiceDefinitionRetriever で、次の省略可能な「keySeparator」属性を追加して、区切り文字を置き換えることができます。
+
+[source,java,linenums]
+----
+@WsdlProvider(friendlyName = "Tshirt configuration")
+public class TShirtWSDLProvider {
+    @WsdlServiceRetriever(keySeparator = "#!@") //[MANDATORY]
+    public List<ServiceDefinition> getDefinitions() {...}
+
+    @WsdlServiceEndpoint //[MANDATORY]
+    public String resolveAddress(ServiceDefinition serviceDefinition){...}
+}
+----
+
+==== WSDL 操作の絞り込み
+
+特定の `ServiceDefinition` では、開発者は、WSDL ファイルで定義されている個々の操作を除外する (つまりコネクタユーザに表示しない) ことができます。
+
+アプリケーション開発者に公開する操作ドロップダウンからログイン/ログアウト操作を除外するには、この絞り込みが必要です。
+
+===== 実装
+
+除外した一連の操作は `ServiceDefinition` にリストされる必要があります。これにより、アプリケーション開発者の使用を禁止する必要がある操作は、メタデータキーの取得プロセスで DevKit により効果的に無視されます。
+
+[source,java,linenums]
+----
+@WsdlServiceRetriever
+    public ServiceDefinition getServiceDefinition() {
+           ServiceDefinition service = new DefaultServiceDefinition(
+                          "ServiceId", "tshirt", "tshirt.wsdl","TshirtService","TshirtServicePort");
+
+           service.setExclusions(Arrays.asList("login", "logout"));
+
+            // Exclusions can also be set as:
+            // service.excludeOperation("myUnwantedOp");
+
+            return service;
+    }
+----
+
+除外した操作に一致するメタデータキーは、`getMetaDataKeys()` の呼び出しを介してメタデータキーが返される前に削除されます。
+
+この新しいメソッドでは、Tshirt_ID# の形式でキーが生成されます (Unable to render embedded object: File (@OrderTshirt, Tshirt_ID#) not found)。
+
+=== 複数の WSDL プロバイダの指定
+
+場合によっては、複数の WSDL バージョン設定をサポートしたり、何らかの条件で WSDL をグループ化したりするために、複数の @WsdlProvider があると便利です。
+
+複数のプロバイダを指定する手順は、次のとおりです。
+
+. 抽象クラスとインターフェースを @ConnectionStrategy として使用します。
++
+[source,java,linenums]
+----
+@Connector(name="tshirt", friendlyName="T-Shirt")
+public class WsdlConnector {
+    @ConnectionStrategy
+    private AbstractTShirtWSDLProvider wsdlProvider;
+    //setters and getters
+}
+----
++
+. 抽象クラスに動作を与えます。
++
+[source,java,linenums]
+----
+public abstract class AbstractTShirtWSDLProvider {
+    @Configurable
+    @Default("http://myinstance.tshirt.com/incident.do?WSDL")
+    private String address;
+
+    @WsdlServiceEndpoint //[MANDATORY]
+    public String resolveAddress(ServiceDefinition serviceDefinition){ // Match exact signature
+        StringBuilder sb = new StringBuilder();
+        sb.append(address)
+                .append("/service=").append(serviceDefinition.getService().get())
+                .append("/v23.0");
+        return sb.toString();
+    }
+    //setters and getters
+}
+----
++
+. 抽象クラスの最初のプロバイダ実装をコーディングします (女性の T シャツ用など)。
++
+[source,java,linenums]
+----
+@WsdlProvider(configElementName = "config-woman", friendlyName = "Tshirt for woman configuration")
+public class TShirtWSDLProvider extends AbstractTShirtWSDLProvider {
+    @WsdlServiceRetriever //[MANDATORY]
+    public List&lt;ServiceDefinition&gt; getDefinitions() { // Match exact signature
+        List&lt;ServiceDefinition&gt; serviceDefinitions = new ArrayList&lt;ServiceDefinition&gt;();
+        serviceDefinitions.add(new DefaultServiceDefinition("Woman-Tshirt_ID","Woman-T-Shirt","woman-tshirt.wsdl",null, null));
+        return serviceDefinitions;
+    }
+}
+----
++
+. 抽象クラスの次のプロバイダ実装をコーディングします (この場合は、男性の T シャツ用)。
++
+[source,java,linenums]
+----
+@WsdlProvider(configElementName = "config-man", friendlyName = "Tshirt for male configuration")
+public class TShirtWSDLProvider extends AbstractTShirtWSDLProvider {
+    @WsdlServiceRetriever //[MANDATORY]
+    public List&lt;ServiceDefinition&gt; getDefinitions() { // Match exact signature
+        List&lt;ServiceDefinition&gt; serviceDefinitions = new ArrayList&lt;ServiceDefinition&gt;();
+        serviceDefinitions.add(new DefaultServiceDefinition("Male-Tshirt_ID","Male-T-Shirt","male-tshirt.wsdl",null, null));
+        return serviceDefinitions;
+    }
+}
+----
++
+ステップ 3 と 4 の両方で、設定の種別ごとに 1 つずつ、2 つのグローバル要素が生成されます。この両方の種別は @ConnectionStrategy の *AbstractTShirtWSDLProvider* から派生した同じ種別を表すためです。各サブクラスは具象的な ServiceDefinitions を返すのみですが、抽象クラスでのアドレスの解決方法に依存します (AbstractTShirtWSDLProvider の @WsdlServiceEndpoint を参照)。
+
+=== WSDL プロバイダの複数レベルの DataSense
+
+@WsdProvider を使用して WSDL ベースのコネクタを実装する場合、開発者は 1 つまたは複数の WSLDProvider 戦略から取得した 1 つまたは複数のサービス定義を提供します。この各 ServiceDefinitions で、コネクタは複数の操作を提供します。
+
+このコネクタを使用することは、呼び出すサービスと操作をユーザが選択することを意味します。
+
+現在、この選択は 1 つのハッシュされたキーを使用して行われます。たとえば、`_ServiceOne||OperationTwo_` を、Studio の 1 つのドロップダウンで選択可能なキーにすることができます。
+
+このシナリオでは、ユーザがサービスと操作の組み合わせを選択するためのより簡単でわかりやすい方法が提供されます。複数のサービスが定義されている場合は 2 つのドロップダウンを使用し、1 つのサービスが存在し、操作のみを指定する必要がある場合は 1 つのドロップダウンを使用します。
+
+==== 用語集
+
+ServiceDefinition: ランタイム (Mule ESB) またはデザインタイム (Anypoint Studio) の用途で使用する、ローカル (コネクタの JAR 内など) またはリモート (URL など) でアクセス可能な WSDL ファイルの表現。
+
+ServiceDefinitionRetriever: ServiceDefinition によりモデル化された WSDL ファイルのコレクションを返します。
+
+keySeparator: サービス-操作の複合キー内でサービスと操作の間の区切り文字として機能する 1 つまたは複数の文字。キーが選択されると、アプリケーションの XML に含まれます。
+
+keyLabels: Studio に表示するドロップダウンの表示ラベルとして使用する名前。
+
+==== 考えられるシナリオ
+
+[%header%autowidth.spread]
+|===
+|ケース ID |ドロップダウン |定義されるサービス |検索の戻り値のデータ型 |keySeparator |keyLabels
+|A |2 |複数 |List<ServiceDefinition> |省略可能 |デフォルト
+|B |2 |複数 |List<ServiceDefinition> |省略可能 |上書き: 2 つ必要
+|C |1 |1 つ |ServiceDefinition |上書きなし |上書き: 1 つ必要
+|===
+
+==== ケース A: 複数サービスの例 - すべてデフォルト
+
+このケースでは、複数のサービスがあり、サービスは、それが提供する操作を呼び出すことができる場所で宣言されます。次に、以下のドロップダウンのデフォルト表示ラベルを使用して、ServiceDefinition のリストを返します。
+
+* WSDL: サービスの displayName を含むドロップダウン用
+* Operation (操作): サービスで公開されているすべての操作を表示する 2 番目のドロップダウン用
+
+[source,java,linenums]
+----
+@WsdlServiceDefinitionRetriever
+public List<ServiceDefinition> getDefinitions() {
+
+    List<ServiceDefinition> serviceDefinitions = new ArrayList<ServiceDefinition>();
+
+    serviceDefinitions.add(new DefaultServiceDefinition("ServiceId_1", "ServiceDisplayName First",
+                    "https://www.sandbox.service.com/wsdl/MySampleWsdl.wsdl", "service-name", "service-port"));
+    serviceDefinitions.add(new DefaultServiceDefinition("ServiceId_2", "ServiceDisplayName Second",
+                    "https://www.sandbox.service.com/wsdl/MyOtherWsdl.wsdl", "different-service-name", "service-port"));
+
+    return serviceDefinitions;
+}
+----
+
+==== ケース B: 複数サービスの例 - カスタム表示ラベル
+
+デフォルトの表示ラベルが私のドメインにとって意味がない場合はどうしますか? この場合、開発者が  _keyLabels_  属性で *2* つの表示ラベルを宣言できます。
+
+このラベルは前述の「WSDL」と「Operation (操作)」の表示ラベルを順に置き換えます。
+
+デフォルトの区切り文字 '||' を使用すると WSDL が原因で ID がクラッシュする場合はどうしますか? この場合、以下のコードのように、デフォルトの keySeparator を上書きすることができます。これは、アプリケーションの XML に記述されるキーにのみ反映され、ドロップダウンには影響しません。
+
+[source,java,linenums]
+----
+@WsdlServiceDefinitionRetriever(keySeparator="@@", keyLabels={"Table", "Module"})
+public List<ServiceDefinition> getDefinitions() {
+
+    List<ServiceDefinition> serviceDefinitions = new ArrayList<ServiceDefinition>();
+    serviceDefinitions.add(new DefaultServiceDefinition("ServiceId_1", "ServiceDisplayName First",
+            "https://www.sandbox.service.com/wsdl/MySampleWsdl.wsdl",
+            "service-name", "service-port"););
+    serviceDefinitions.add(new DefaultServiceDefinition("ServiceId_2", "ServiceDisplayName Second",
+            "https://www.sandbox.service.com/wsdl/MyOtherWsdl.wsdl",
+            "different-service-name", "service-port"););
+    return serviceDefinitions;
+}
+----
+
+==== ケース C: 単一サービスの例 - 単一ドロップダウン
+
+単一の ServiceDefinition のみが必要な簡単なケースでは、ServiceDefinitionRetriever の戻り値のデータ型を、List (リスト) を使用するのではなく、単一の ServiceDefinition に対応するように変更する必要があります。
+
+単一の ServiceDefinition を返す場合は、[WSDL] ドロップダウンが表示されずに [Operation (操作)] ドロップダウンのみが表示されるため、使用されるキーに影響します。
+
+また、キーは区切り文字で分割される複合キーではなく、単一の `_operation-id_` キーになります。これは、単一要素のリストを返すこととは異なります。この単一要素のリストの場合、2 つのドロップダウンが表示されます。
+
+[source,java,linenums]
+----
+@WsdlServiceDefinitionRetriever(keyLabels={"Operation"})
+public ServiceDefinition getDefinitions() {
+    return new DefaultServiceDefinition("ServiceId", "ServiceDisplayName",
+        "https://www.sandbox.service.com/wsdl/MySampleWsdl.wsdl", "service-name", "service-port");
+}
+----
+
+==== 複数の WSLDProvider の制限
+
+複数の WSDLProvider 戦略を宣言する場合、そのすべてが ServiceDefinitionRetriever 宣言内で一貫している必要があります。
+
+これには次が含まれます。
+
+* 戻り値のデータ型がすべての戦略で同じである必要があります。つまり、すべてが List<ServiceDefinition> を返す、またはすべてが ServiceDefinition を返すかのどちらかです。
+* 上書きする場合、すべての検索で表示ラベルが同じである必要があります。
+* 上書きする場合、すべての検索で keySeparator が同じである必要があります。
+
+==== 区切り文字と表示ラベルの制限
+
+* `_keySeparator_` に `# [ ]` 文字を含めることはできません。
+* `_keyLabels_` にカンマ (,) 文字を含めることはできません。
+
+== 認証オプション
+
+デフォルトでは、認証メカニズムは生成されません。
+
+ウィザードの最後のページで、コネクタで必要とする認証種別を指定できます。
+
+image::wsdlsecurity.png[WSDLSecurity]
+
+このオプションでは、@WsdlProvider アノテーション付きクラスに生成されたコードが変更されます。
+
+https://en.wikipedia.org/wiki/Basic_access_authentication[[HTTP Basic (HTTP 基本)]]では、ユーザ名とパスワードのセキュリティがコネクタに提供されます。&#8203;https://en.wikipedia.org/wiki/WS-Security[WS-Security] では、コネクタのセキュリティを強化するためのトークンが提供されます。
+
+コネクタプロジェクトを作成した後、セキュリティを [None (なし)] から [HTTP Basic (HTTP 基本)] または [WS-Security] に変更するには、@WsdlProvider クラスへのコードの追加や削除が必要です。これを行う必要がある場合、目的のセキュリティオプションを使用して新しいプロジェクトを作成し、@WsdlProvider クラスでコードの追加または削除を行います。
+
+HTTP 基本のコード例を次に示します。このコードを、セキュリティのない前述の @WsdlProvider クラスのコードと比較することで、変更の範囲を確認できます。
+
+[source,java,linenums]
+----
+package org.mule.modules.water.config;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.mule.api.annotations.ws.WsdlTransportRetriever;
+import org.mule.devkit.api.ws.transport.WsdlTransport;
+import org.mule.devkit.api.ws.transport.HttpBasicWsdlTransport;
+import org.mule.api.annotations.Configurable;
+import org.mule.api.annotations.display.Password;
+import org.mule.api.annotations.display.Placement;
+import org.mule.api.annotations.components.WsdlProvider;
+import org.mule.api.annotations.ws.WsdlServiceEndpoint;
+import org.mule.api.annotations.ws.WsdlServiceRetriever;
+import org.mule.devkit.api.ws.definition.DefaultServiceDefinition;
+import org.mule.devkit.api.ws.definition.ServiceDefinition;
+import org.mule.api.annotations.param.Optional;
+
+@WsdlProvider(friendlyName = "Configuration")
+public class ConnectorConfig {
+    @Configurable
+    @Placement(order = 1)
+    private String username;
+
+    @Configurable
+    @Placement(order = 2)
+    @Password
+    @Optional
+    private String password;
+
+    @WsdlServiceRetriever
+    public List<ServiceDefinition> getServiceDefinitions() {
+        final List<ServiceDefinition> serviceDefinitions = new ArrayList<ServiceDefinition>();
+        serviceDefinitions.add(new DefaultServiceDefinition(
+                "SunSetRiseService_SunSetRiseServiceSoap",
+                "sunsetriseservice (SunSetRiseServiceSoap)",
+                "wsdl/sunsetriseservice.wsdl",
+                "SunSetRiseService",
+                "SunSetRiseServiceSoap"));
+        serviceDefinitions.add(new DefaultServiceDefinition(
+                "SunSetRiseService_SunSetRiseServiceSoap12",
+                "sunsetriseservice (SunSetRiseServiceSoap12)",
+                "wsdl/sunsetriseservice.wsdl",
+                "SunSetRiseService",
+                "SunSetRiseServiceSoap12"));
+        serviceDefinitions.add(new DefaultServiceDefinition(
+                "SunSetRiseService_SunSetRiseServiceHttpPost",
+                "sunsetriseservice (SunSetRiseServiceHttpPost)",
+                "wsdl/sunsetriseservice.wsdl",
+                "SunSetRiseService",
+                "SunSetRiseServiceHttpPost"));
+        serviceDefinitions.add(new DefaultServiceDefinition(
+                "SunSetRiseService_SunSetRiseServiceHttpGet",
+                "sunsetriseservice (SunSetRiseServiceHttpGet)",
+                "wsdl/sunsetriseservice.wsdl",
+                "SunSetRiseService",
+                "SunSetRiseServiceHttpGet"));
+        return serviceDefinitions;
+    }
+    @WsdlServiceEndpoint
+    public String getServiceEndpoint(ServiceDefinition definition) {
+        String result;
+        final String id = definition.getId();
+        switch(id){
+                case "SunSetRiseService_SunSetRiseServiceSoap": {
+                result = "http://www.webservicex.net/sunsetriseservice.asmx";
+                break;
+            }
+                case "SunSetRiseService_SunSetRiseServiceSoap12": {
+                result = "http://www.webservicex.net/sunsetriseservice.asmx";
+                break;
+            }
+                case "SunSetRiseService_SunSetRiseServiceHttpPost": {
+                result = "http://www.webservicex.net/sunsetriseservice.asmx";
+                break;
+            }
+                case "SunSetRiseService_SunSetRiseServiceHttpGet": {
+                result = "http://www.webservicex.net/sunsetriseservice.asmx";
+                break;
+            }
+                default: {
+                throw new IllegalArgumentException(id + " endpoint could not be resolved.");
+            }
+        }
+        return result;
+    }
+    @WsdlTransportRetriever
+    public WsdlTransport resolveTransport(ServiceDefinition serviceDefinition) {
+        return new HttpBasicWsdlTransport(getUsername(), getPassword());
+    }
+    public String getUsername() {
+        return username;
+    }
+    public void setUsername(String username) {
+        this.username = username;
+    }
+    public String getPassword() {
+        return password;
+    }
+    public void setPassword(String password) {
+        this.password = password;
+    }
+}
+----
+
+== WSDL およびエンベロープ認証
+
+*呼び出し*​操作を使用して SOAP API を実行する具体的な方法があるにもかかわらず、コネクタには、エンベロープに署名して API に対する認証を実行する方法が必要です。DevKit は次のメカニズムを提供します。
+
+* 安全なユーザ名トークン、および
+* セキュリティタイムスタンプ
+
+@WsdlSecurityStrategyResolver のアノテーション付きメソッドでコレクションを返すことでエンベロープに署名します。
+
+[source,java,linenums]
+----
+@WsdlProvider(friendlyName = "Tshirt configuration")
+public class TShirtWSDLProvider {
+    @WsdlServiceDefinitionRetriever //[MANDATORY]
+    public List<ServiceDefinition> getDefinitions() {...}
+
+    @WsdlServiceEndpoint //[MANDATORY]
+    public String resolveAddress(ServiceDefinition serviceDefinition){...}
+
+    @WsdlSecurity //[OPTIONAL]
+    // Match exact signature
+    public List<WsdlSecurityStrategy> getStrategies(ServiceDefinition serviceDefinition){
+        List<WsdlSecurityStrategy>;
+        strategies = new ArrayList<WsdlSecurityStrategy>();
+        // (a) Strategy-based in security username token profile
+        strategies.add(new WsdlUsernameToken(username, password,
+          passwordType, addNonce, addCreated));
+        // (b) Strategy-based in security timestamp
+        strategies.add(new WsdlTimestamp(1000));
+        return strategies;
+    }
+}
+----
+
+この戦略の重要な部分は、@WsdlSecurity 内で、コネクタ開発者はすでに配置されている @Configurable に依存する必要があることです。つまり、ユーザ名トークンプロファイルを使用する場合、ユーザ名やパスワードなどを使用してコネクタをパラメータ化する方法が必要です。@WsdlSecurityStrategy の具象インスタンスが初期化されると、DevKit が残りを処理し、Web サービスコンシューマ内の基礎となるエンジンに対してそれぞれをパラメータ化します。
+
+=== HTTP 基本認証を使用したトランスポートの認証
+
+前のセクションではエンベロープの署名について説明しましたが、エンベロープを送信するために使用する、基礎となるトランスポートをカスタマイズする方法があります。これにより、HTTP 基本認証を有効にして、多くのユースケースが可能になります。
+
+これを実現するには、次のように WsdlTransport 具象オブジェクト @WsdlTransportRetriever を返します。
+
+[source,java,linenums]
+----
+@WsdlProvider(friendlyName = "Tshirt configuration")
+public class TShirtWSDLProvider {
+    @WsdlServiceRetriever //[MANDATORY]
+    public List<ServiceDefinition> getDefinitions() {...}
+
+    @WsdlServiceEndpoint //[MANDATORY]
+    public String resolveAddress(ServiceDefinition serviceDefinition) {...}
+
+    @WsdlTransportRetriever //[OPTIONAL]
+    public WsdlTransport resolveTransport(ServiceDefinition serviceDefinition) {
+        return new HttpBasicWsdlTransport("PROVIDE USERNAME", "PROVIDE PASSWORD");
+    }
+}
+----
+
+より高度なユースケースとして、プロキシ、SSL、ソケットオプションなどを含め、基礎となるトランスポート全体を設定しなければならない場合があります。この場合、HttpRequesterConfig 要素を使用します。このような高度な**​**シナリオでは、次のようにできます。
+
+[source,java,linenums]
+----
+@WsdlProvider(friendlyName = "Tshirt configuration advance")
+public class TShirtWSDLProvider {
+    @Configurable
+    //Let DevKit take care of the UI and initialization from a bean
+    private HttpRequesterConfig requesterConfig;
+
+    @WsdlServiceRetriever //[MANDATORY]
+    public List<ServiceDefinition> getDefinitions() {...}
+
+    @WsdlServiceEndpoint //[MANDATORY]
+    public String resolveAddress(ServiceDefinition serviceDefinition){...}
+
+    @WsdlTransportRetriever //[OPTIONAL]
+    public WsdlTransport resolveTransport(ServiceDefinition serviceDefinition){
+        return new HttpRequesterConfigWsdlTransport(getRequesterConfig());
+    }
+
+    public HttpRequesterConfig getRequesterConfig() {
+      return requesterConfig;
+    }
+
+    public void setRequesterConfig(HttpRequesterConfig requesterConfig) {
+      this.requesterConfig = requesterConfig;
+    }
+}
+----
+
+=== エンベロープヘッダー
+
+API によっては、送信するエンベロープごとにカスタムヘッダーを送信する必要があります。DevKit には、操作の実行前にヘッダーを調整するための仕掛けがあります。上記の例は、*cookHeaders* メソッドでこれを実現する方法を示しています。&#8203;https://www.owasp.org/index.php/XML_External_Entity_(XXE)_Prevention_Cheat_Sheet#JAXP_DocumentBuilderFactory_and_SAXParserFactory[OWASP ガイダンス]に従って、この XML 解析コードを XXE 攻撃から保護するようにしてください。
+
+[source,java,linenums]
+----
+@WsdlProvider(friendlyName = "Tshirt configuration")
+public class TShirtWSDLProvider {
+    @WsdlServiceRetriever //[MANDATORY]
+    public List<ServiceDefinition> getDefinitions() {...}
+
+    @WsdlServiceEndpoint //[MANDATORY]
+    public String resolveAddress(ServiceDefinition serviceDefinition){...}
+
+    @WsdlHeaders
+    public List<Document> cookHeaders(ServiceDefinition serviceDefinition,
+           String operationName)
+    {
+        List<Document> result= new LinkedList<Document>();
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = dbf.newDocumentBuilder();
+        result.add(getDocument("header1", "item", "myCustomAttr",
+               "Some fancy value attr for op["+operationName+"]",
+               "Text within element", builder));
+        result.add(getDocument("header2", "item2", "myCustomAttr2",
+               "Some fancy value attr2 for op["+operationName+"]",
+               "Text within element2", builder));
+        return result;
+    }
+
+    private Document getDocument(String rootStringValue, String itemStringValue,
+            String attrStringNameValue, String attrStringValue,
+            String textStringValue, DocumentBuilder builder)
+    {
+        Document doc = builder.newDocument();
+        // Create the root element node
+        Element element = doc.createElement(rootStringValue);
+        element.setAttributeNS("http://www.w3.org/2000/xmlns/",
+                "xmlns:ns2", "http://someurl");
+        doc.appendChild(element);
+        // Add element after the first child of the root element
+        Element itemElement = doc.createElement(itemStringValue);
+        element.appendChild(itemElement);
+        // Add an attribute to the node
+        itemElement.setAttribute(attrStringNameValue, attrStringValue);
+        // Create text for the node
+        itemElement.insertBefore(doc.createTextNode(textStringValue),
+                    itemElement.getLastChild());
+        return doc;
+    }
+}
+----
+
+前のヘッダーからの出力は、次のエンベロープの *soap:Header* 要素内にあります。
+
+エンベロープのスニペット:
+
+[source,xml,linenums]
+----
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Header>
+  <header1 xmlns:ns2="http://someurl">
+    <item myCustomAttr="some fancy value attr for op[SELECTED_OPERATION_NAME]">Text within element</item>
+  </header1>
+  <header2 xmlns:ns2="http://someurl">
+    <item2 myCustomAttr2="some fancy value attr2 for op[SELECTED_OPERATION_NAME]">text within element2</item2>
+  </header2>
+</soap:Header>
+<soap:Body>
+  ...
+</soap:Body>
+</soap:Envelope>
+----
+
+== 関連情報
+
+* xref:creating-a-java-sdk-based-connector.adoc[Java SDK ベースのコネクタの作成]

@@ -1,0 +1,54 @@
+= 認証なし
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, 認証
+
+コネクタで認証を使用しない場合、`@Connector` を `@Configuration` と共に使用できます。
+
+`@Configuration` はコネクタ設定として `@Configurable` 項目のセットをコネクタに追加します。
+
+== 前提条件
+
+このドキュメントでは、読者が xref:index.adoc[Anypoint コネクタ DevKit] に精通していて、コネクタで設定を実装する準備ができていることを前提としています。
+
+== @Configuration アノテーション
+
+コネクタで `@Configuration` を実装するには、新しいクラスを作成して @Configuration アノテーションを付加します。
+
+次の表で、`@Configuration` アノテーションのパラメータについて説明します。
+
+[%header,cols="4*a"]
+|===
+|パラメータ |説明 |必須かどうか |デフォルト値
+|*friendlyName* |コネクタ設定ポップアップに表示される名前を定義します。 |✓
+|*configElementName* |Mule アプリケーションで使用される設定の名前を定義します。 |  |config
+|===
+
+== 例
+
+これらのインスタンス変数に public getter および setter (非表示) があることを確認してください。
+
+[source,java,linenums]
+----
+@Connector(name = "connector")
+public class MyConnector
+{
+   @ConnectionStrategy
+   private ConnectorConfiguration strategy;
+
+/**
+ * Processors
+ */
+}
+
+@Configuration(friendlyName="Foo Configuration")
+public class ConnectorConfiguration
+{
+   @Configurable
+   private String property;
+
+   @Configurable
+   private String anotherProperty;
+}
+----

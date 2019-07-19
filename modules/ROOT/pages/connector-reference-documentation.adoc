@@ -1,0 +1,277 @@
+= コネクタドキュメントの作成
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, リファレンスドキュメント, apidoc, javadoc
+
+このドキュメントでは、コネクタコードで Javadoc コメントを作成し、コネクタユーザが解読できるドキュメントを生成する方法について説明します。
+
+
+== はじめに
+
+コネクタを構築したら、顧客が効果的に使用できるようにその機能を文書化し、カスタマーサポートやトレーニングのコストを削減します。
+
+通常、コネクタドキュメントは以下で構成されています。
+
+* リファレンスドキュメント (DevKit APIdoc によって作成される。<<Generating Documentation,「ドキュメントの生成」>>を参照)
+* README
+* リリースノート
+* ユースケースが含まれるユーザガイド - 例については、xref:packaging-your-connector-for-release.adoc#documenting-with-use-cases[ユースケースが含まれるドキュメント]についての説明を参照してください。
+
+[NOTE]
+Mule では、カスタム Javadoc Doclet やいくつかの DevKit 固有の Java アノテーションを追加して http://en.wikipedia.org/wiki/Javadoc[Javadoc] を強化し、コネクタのテクニカルリファレンスドキュメントの作成を自動化および簡略化します。
+
+== 前提条件
+
+このドキュメントは、読者が Anypoint Studio と Javadoc に精通していることを前提としています。また、コネクタの開発とテストがすでに完了していることも前提としています。
+
+== ドキュメントを生成するためのタグ
+
+以降のセクションでは、Anypoint DevKit を使用して構築されるコネクタのドキュメントを生成するために使用できる Javadoc タグおよび構文について説明します。
+
+=== サポートされている Javadoc タグ
+
+次の表では、DevKit でサポートされている Javadoc タグについて説明します。これらのタグは、このドキュメント全体を通して例で使用されます。
+//TODO: screenshots or provide link to existing apidoc?
+
+[%header,cols="20a,40a,40a"]
+|===
+|タグ|説明|例
+|`@link` | 完全修飾名が提供されている場合、指定されたパッケージのドキュメントを参照するインラインリンクを提供します。提供されていない場合、リンクの後のテキストは文字列として解析されます。形式: `{@link package.name.Class}` a|
+`* @param document`
+`* a {@link org.bson.Document} instance.`
+
+image::javadoc-link-sample.png[javadoc-link]
+|`@see` | URL (関連するクラスまたはメソッドが説明されているページなど) へのインラインリンクを提供します。 a| Javadoc コメント内の URL をハイパーリンクとして解析するには、Javadoc タグ `@see` を使用して、`+{@see http://example.com}+` または `{@see <a href="http://example.com">http://example.com</a>}` を解析して完全な URL を表示するインラインリンクを作成します。 使用方法についての詳細は、&#8203;http://docs.oracle.com/javase/7/docs/technotes/tools/windows/javadoc.html#see[Javadoc リファレンス]を参照してください。
+|`@api.doc`|サービス API のドキュメントへのリンクを提供するドキュメントに新しいセクションを追加します。タグの後に html を使用するかどうかを選択できます。 a|
+`* @api.doc <a href="http://www.salesforce.com/us/developer/docs/api/Content/sforce_api_calls_create.htm">create()</a>`
+
+image::apidoc-ref-sample.png[]
+|`@javadoc` | コネクタクラスで使用できます。たとえば、`@javadoc.url` (この後には、javadoc で参照されるデータ型を参照するために `@link` タグで使用できる Java パッケージ名や Javadoc URL が続く) のようになります。 | コードコメントのスニペットについては、<<Annotation for Non-Java Data Types,Java 以外のデータ型のアノテーション>>についての説明を参照してください。
+|`@param` | メソッドの説明の下で使用されます。`@param` は、パラメータ名とその説明を参考資料に追加します。説明は、下の行にリストする必要があります。 a|
+`* @param collection`
+
+`* the name of the collection to update`
+
+image::apidoc-param-sample.png[apidoc-param]
+|`@return` | 関数の戻り値のデータ型の説明をドキュメントの「Returns (戻り値)」セクションに追加します。 a|
+`* @return the id that was just inserted`
+
+|===
+
+どのように表示されるのかを確認するために、DevKit 3.9.0 で生成された Salesforce コネクタの操作についてのドキュメントを見てみましょう。
+
+image::apidoc-look.png[]
+
+[NOTE]
+ドキュメントは必須ではありませんが、Javadoc チェックを無効にしないとエラーが表示されます。Javadoc チェックを無効にして、エラーを警告として表示するには、プロジェクトを右クリックして、*[Anypoint Connector (Anypoint コネクタ)]* > *[Disable Javadoc check (Javadoc チェックを無効化)]* をクリックします。
+
+=== @Connector および @Author メタデータ
+
+`@Connector` アノテーションが付加された各クラスには、拡張機能の概要が含まれるクラスレベルの Javadoc コメントが必要です。これには、`@author` アノテーションを含めることもできます。
+
+[source,java,linenums]
+----
+/**
+ * CMIS (Content Management Interoperability Services) is a standard for improving interoperability between ECM systems.
+ *
+ * @author MuleSoft, Inc.
+ */
+@ReconnectOn(exceptions = CMISConnectorConnectionException.class)
+@Connector(name = "cmis", schemaVersion = "1.1", friendlyName = "CMIS")
+public class CMISConnector implements CMISFacade {
+...
+----
+
+=== @Configurable 属性の文書化
+
+コネクタの `@Configurable` 属性は、属性を簡単に説明する Javadoc コメントを使用して文書化できます。
+
+[source,java,linenums]
+----
+/**
+ * The username to access the service
+ */
+ @Configurable
+ private String username;
+
+/**
+ * The password to access the service
+ */
+ @Configurable
+ private String password;
+
+/**
+ * The API endpoint;
+ */
+ @Configurable
+ private String apiEndpoint;
+----
+
+`@Default` アノテーションは、属性に対応する行の [Default Value (デフォルト値)] 列の下の括弧の間に値を配置します。この例では、`host` のデフォルト値は `localhost:27017` です。
+
+[source,java,linenums]
+----
+/**
+ * A list of MongoDB instances, with the format <code>host:port</code>, separated by commas.
+ *
+ * <pre>
+ * Example: 127.0.0.1:27017, 192.168.1.2:27017
+ * </pre>
+ *
+ */
+@Configurable
+    @Default("localhost:27017")
+    @FriendlyName("Servers (host:port)")
+    @Placement(group = "Connection")
+    private String host;
+----
+
+上記のコメントにより、属性テーブルは次のように入力されます。
+
+image::host-attr.png[]
+
+=== 接続戦略の文書化
+
+DevKit のバージョン 3.9.0 では、コネクタでサポートされている数の接続戦略のドキュメントを生成でき、*[Configs (設定)]* ヘッダーの下に表示されます。
+
+image::multiple-configs.png[]
+
+=== @Processor メソッドおよびパラメータの文書化
+
+(ストリーミング API の) `@Processor` または `@Source` アノテーションが付加された各メソッドには、以下が含まれる Javadoc コメントが必要です。
+
+* メソッドの使用方法の説明
+* Javadoc `@param` タグとパラメータの説明 (メソッドのパラメータごと)
+* Javadoc `@return` タグと戻り値の説明 (メソッドの戻り値のデータ型が `void` でない場合)
+
+上記の例が含まれる次のコードサンプルを確認してください。
+
+[source,java,linenums]
+----
+/**
+ * Inserts a document into a collection, setting its ID if necessary.
+ *
+ *
+ * @param collection
+ *            the name of the collection where the given document should be inserted.
+ * @param document
+ *            a {@link Document} instance.
+ * @return the id that was just inserted
+ */
+@Processor
+public String insertDocument(final String collection, @RefOnly @Default("#[payload]") final Document document) {
+    Validate.notNull(collection);
+    Validate.notNull(document);
+    return config.getClient().insertObject(collection, document);
+}
+----
+
+=== 外部 Javadoc リソースへのリンク
+
+ドキュメントからサードパーティ Javadoc リソースへのリンクをサポートするには、Javadoc タグ `@javadoc.url` で​*コネクタクラス*​にアノテーションを付加して URL を 1 回参照します。
+
+次の例のように `+@javadoc.url package.name[https://javadocurl/];+` の形式を使用します。
+
+[source,java,linenums]
+----
+/**
+*
+* @author MuleSoft
+* @javadoc.url org.bson[https://api.mongodb.org/java/3.1/];
+* @javadoc.url com.mongodb[https://api.mongodb.org/java/3.1/];
+*/
+public class MongoCloudConnector {
+...
+----
+
+=== 外部 Javadoc の @link の使用
+
+`@javadoc.url` タグが設定され、適切な構文を使用してパッケージと URL が指定されていることを確認したら、必要に応じて `@link` タグを使用して、コメント内から機能するリンクを作成します。
+
+[NOTE]
+`@link` の後に​*クラスの完全修飾名*​を指定して、機能する URL を作成する必要があります (例: `{@link org.bson.Document}`)。このようにしないと、問題のデータ型のパッケージが見つかりません。
+
+
+[source,java,linenums]
+----
+/**
+ * Inserts a document in a collection, setting its ID if necessary.
+ * @see <a href="http://example.com">http://example.com</a>
+ *
+ * @param collection
+ *            the name of the collection where to insert the given document.
+ * @param document
+ *            a {@link org.bson.Document} instance.
+ * @return the id that was just inserted
+ */
+@Processor
+public String insertDocument(final String collection, @RefOnly @Default("#[payload]") final Document document) {
+...
+----
+
+
+DevKit は、MongoDB Java API のベース URL、特定のパッケージへのパス、特定のクラスを連結して、適切な URL を形成します。
+
+image::apidoc-mongo-document-attr.png[]
+
+上記のドキュメントの *[Document (ドキュメント)]* をクリックすると、ユーザはこのクラスの参考資料 (`+https://api.mongodb.org/java/3.1/org/bson/Document.html+`) に移動します。
+
+=== XML コードのサンプルファイル
+
+サンプルファイルは、`/doc` フォルダに保存され、次の構造に準拠している必要があります。
+
+[source,xml,linenums]
+----
+<!-- BEGIN_INCLUDE(myconnector:method-a) -->
+// example here
+<!-- END_INCLUDE(myconnector:method-a) -->
+<!-- BEGIN_INCLUDE(myconnector:method-b) -->
+// example here
+<!-- END_INCLUDE(myconnector:method-b) -->
+...
+----
+
+CMIS コネクタの `xml.sample` ファイルの例を次に示します。
+
+[source,xml,linenums]
+----
+<!-- BEGIN_INCLUDE(cmis:getObjectByPath) -->
+        <cmis:get-object-by-path path="/mule-cloud-connector" config-ref="config" />
+<!-- END_INCLUDE(cmis:getObjectByPath) -->
+----
+
+[NOTE]
+DevKit APIDoc では、`xml.sample` ファイルから同じコネクタ操作のサンプルを複数生成できます。もちろん、サンプルは上記の「_INCLUDE」タグ構造に従う必要があります。DevKit 3.9.0 以降、`@sample.xml` タグはサポート​*されません*。
+
+== ドキュメントの生成
+
+ドキュメントをプレビューするには、Package Explorer でプロジェクトを右クリックし、*[Anypoint Connector (Anypoint コネクタ)]* > *[Preview Documentation (ドキュメントをプレビュー)]* を選択します。
+
+[IMPORTANT]
+ここで説明されている更新されたドキュメント機能にアクセスするには、*DevKit 3.9.0* と *JDK 7 以上*​が有効になっている必要があります。適切なバージョンの DevKit が pom.xml ファイルで参照されていることを確認します。システムで使用される JDK についても同様です。
+
+コネクタのドキュメントを生成すると (*[Project (プロジェクト)]* > *[Generate Javadoc (Javadoc を生成)]*)、コード内で追加した、コネクタのメソッドおよび属性を説明する Javadoc コメントのわかりやすい参照として *HTML* ファイルと http://asciidoctor.org/docs/what-is-asciidoc/#what-is-asciidoc[AsciiDoc] ファイルの両方が DevKit によって自動的に作成されます。
+
+=== Maven コマンドの使用
+
+また、コネクタのルートディレクトリに移動して、次の Maven コマンドを実行し、ドキュメントを生成することもできます。
+
+----
+mvn clean compile -DgenerateApidocs
+----
+
+
+生成されるドキュメントは、コネクタフォルダの新しい `target/apidocs` ディレクトリに作成されています。完全に生成されたドキュメントをブラウザで表示するには、`connectorname-apidoc.html` ファイルを開きます。
+
+=== Studio のコンテキストヘルプ
+
+次のようにデザイン時に Studio 内のユーザにコンテキストヘルプを提供するために、同じ Javadoc コメントが DevKit でもコンシュームされます。
+
+image::contextual-help-box.png[コンテキストヘルプ]
+
+コネクタを構築するときに、生成されるドキュメントのレビューを行い、コンテンツが健全で正しいことを確認します。不足があれば、いつでもコードで Javadoc コメントに詳細を追加して、ドキュメントを再生成できます。
+
+== 関連情報
+
+必要なすべての操作をコネクタに追加し、テストを開発したら、xref:packaging-your-connector-for-release.adoc[「リリースに向けたコネクタのパッケージ化」]に進みます。

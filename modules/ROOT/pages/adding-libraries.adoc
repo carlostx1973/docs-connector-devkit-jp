@@ -1,0 +1,48 @@
+= コネクタビルドへのネイティブライブラリおよび JAR の追加
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: ネイティブ, JAR, ライブラリ, devkit, コネクタ
+
+同じ JAR 内にバンドルできない連動関係を持つコネクタを作成する場合、コネクタへのファイルの追加をユーザに促すように Anypoint Studio に指示できます。
+
+ビルドにネイティブライブラリと JAR ファイルを追加する手順は、次のとおりです。
+
+. ファイルを追加してこの機能をトリガします。コネクタには、次のパスで設定ごとに 1 つのファイルが必要です。
++
+`<root_connector_folder>src/main/resources/META-INF/<connector_name>-<configElementName>-required-libs.xml`
++
+例: `<root_connector_folder>src/main/resources/META-INF/peoplesoft-connector-Configuration-required-libs.xml`
++
+. *-required-libs.xml* ファイルに namespace、require、および jar タグが含まれていることを確認します。
++
+次に例を示します。
++
+[source,xml,linenums]
+----
+<namespace xmlns="http://www.mulesoft.org/schema/mule/tooling.attributes" xmlns:mule="http://www.mulesoft.org/schema/mule/core">
+    <require>
+       <jar name="PeopleSoft Java Object Adapter (psjoa-1.0.jar)"
+fileName="psjoa(.*)\.jar" targetFolder="/lib/peoplesoft"
+targetRuntimeFolder="/plugins" className="psft.pt8.joa.IPSMessage"/>
+    </require>
+</namespace>
+----
++
+この例では、PeopleSoft コネクタの *jar* 要素に次の属性が含まれています。
++
+*name*: Anypoint Studio の指示画面に表示する JAR 名。
++
+*fileName*: それが必要なものであることを確認するために選択済み JAR に適用する検索条件。これは JAR の実際のファイル名と同じです。
++
+*targetFolder*: JAR をコピーするプロジェクト内のフォルダ。
++
+*targetRuntimeFolder*: ランタイムが置かれるフォルダ。
++
+*className*: それが必要なものであることを確認するために JAR に適用する検索条件。これは、選択した JAR 内で宣言されたクラスを検索します。クラス名はクラスの完全修飾名である必要があります。
++
+. 必要なライブラリ XML ファイルを指定すると、Anypoint Studio によって、ライブラリのインストールオプションが表示されるように設定の記述が変更されます。
++
+image::36reqddeps.png[36ReqdDeps]
+
+NOTE: 特定の設定でライブラリが不要な場合は、その設定用の required-libs.xml ファイルを作成しないでください。

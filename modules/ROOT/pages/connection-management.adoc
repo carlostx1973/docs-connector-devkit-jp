@@ -1,0 +1,267 @@
+= 接続管理
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, 接続, 接続性, テスト, 認証
+:keywords: devkit, 接続, 認証, アノテーション, 接続性のテスト, プーリング, 切断, 検証, 識別, 再接続
+
+接続管理フレームワークでは、コネクタのマルチテナント機能 (アプリケーション内でコネクタごとに異なるログイン情報を使用して複数の同時接続を管理する)、および接続プーリングとインスタンスプーリングが提供されます。OAuth 以外の大部分の認証スキームと、認証を必要としない API でこれらの利点を得られます。基本認証は、コネクタで `@ConnectionManagement` 属性を使用して指定されます。
+
+このドキュメントでは、接続管理フレームワーク、公開時に使用する Java アノテーション、およびサービスで認証するコネクタに基本認証のサポートを実装する方法について説明します。この説明の例では、基本ユーザ名/パスワード認証 (最も一般的) による基本認証の使用方法について説明しますが、他の OAuth 以外のプロトコル (SAML、Kerberos、LDAP、NTLM など) に応用したり、カスタム接続を作成したりすることが容易にできます。
+
+DevKit では、OAuth 関連のアノテーションを使用して、OAuth ベースの認証の機能を提供します。詳細は、xref:oauth-v1.adoc[「OAuth V1」]とxref:oauth-v2.adoc[「OAuth V2」]を参照してください。
+
+== 前提条件
+
+このドキュメントは、読者が xref:index.adoc[Anypoint コネクタ DevKit] に精通していて、すでにxref:creating-an-anypoint-connector-project.adoc[コネクタプロジェクトを作成]しており、コネクタに認証を実装する準備が整っていることを前提としています。また、各種xref:authentication-methods.adoc[認証方法]に精通していて、さまざまな xref:authentication.adoc[Devkit の認証サポートオプション]を比較して API への接続に基本認証を選択していることも前提としています。
+
+== 接続管理について
+
+接続管理フレームワークでは、コネクタ開発者はわずかな労力で次の利点を得られます。
+
+* *透過的なマルチテナント* – Mule アプリケーションは、1 つの対象に対して異なるログイン情報を使用して多数の接続を開き、多くのユーザに代わって同時に接続できます。
+* *接続プーリング* – コネクタクラスのインスタンスのプールを自動管理し、接続リソースを効果的に管理します。
+* *例外* - 例外の発生時に自動的に接続を無効化し、必要に応じて再接続できます。
+
+=== 接続管理フレームワークと認証プロトコル
+
+接続管理フレームワークは、ユーザ名/パスワード認証 (最も一般的)、SAML、Kerberos、LDAP、NTLM などの大部分の認証プロトコルと組み合わせて使用できます。
+
+DevKit では、OAuth 関連のアノテーションを使用して、OAuth ベースの認証の機能を提供します。詳細は、xref:oauth-v1.adoc[「OAuth V1」]とxref:oauth-v2.adoc[「OAuth V2」]を参照してください。
+
+== 接続管理アノテーション
+
+Anypoint DevKit では、新しい `@ConnectionStrategy` を作成して接続管理機能をコネクタに簡単に追加できます。この作業は、新しいクラスを作成して、そのクラスに `@ConnectionManagement` アノテーションを付加するだけで済みます。
+
+次の表に、`@ConnectionManagement` アノテーションのパラメータを示します。
+
+[%header,cols="4*"]
+|===
+|パラメータ |説明 |必須かどうか |デフォルト値
+a|
+*friendlyName*
+
+ |コネクタ設定ポップアップに表示される名前を定義します。 | ✓ |
+a|
+*configElementName*
+
+ |Mule アプリケーションで使用される設定の名前を定義します。 |  | config
+|===
+
+== 接続管理 DevKit アノテーション
+
+コネクタで接続管理を使用するには、`@ConnectionManagement` アノテーション付きクラスで次のメソッドを定義してアノテーションを付加します。
+
+* `@Connect` メソッド - 接続を作成する
+* `@Disconnect` メソッド - 明示的に接続を閉じる
+* `@ValidateConnection` メソッド - 接続がまだ有効な場合は true を返し、無効な場合は false を返す
+* `@ConnectionIdentifier` メソッド - 接続プールのコネクタインスタンスの一意の識別子を生成するときに使用されるプレフィックスを返す
+
+これらのメソッドの具体的な実装は、対象によって異なります。アノテーションについての詳細は、&#8203;http://mulesoft.github.io/mule-devkit/[「Anypoint DevKit API Reference (Anypoint DevKit API リファレンス)」]を参照してください。
+
+[source,java,linenums]
+----
+@ConnectionManagement(friendlyName="Connector Connection")
+public class ConnectionManagementStrategy{
+   @Connect
+   @TestConnectivity
+   public void connect(@ConnectionKey String username, @Password String password){
+      ...
+   }
+
+   @Disconnect
+   public void disconnect() {
+       client = null;
+   }
+
+   @ValidateConnection
+   public boolean isConnected() {
+       return client != null;
+   }
+
+   @ConnectionIdentifier
+   public String connectionId() {
+       return client.toString();
+   }
+}
+----
+
+メソッドは、必要に応じて DevKit フレームワークで自動的にコールされます。各自のコードから直接メソッドをコールすることはありません。
+
+
+=== @Connector クラスへの @ConnectionManagement アノテーションの付加
+
+`@ConnectionManagement` クラスの場合、`@Connector` クラスにそれを付加する方法は次のようになります。
+
+[source,java,linenums]
+----
+@Connector(name = "connector")
+public class MyConnectorWithConnectionManagement
+{
+    @ConnectionStrategy
+    private ConnectionManagementStrategy strategy;
+
+    /**
+    * Processors
+    */
+}
+----
+
+strategy に public getter および setter (表示されていない) があることを確認してください。
+
+=== @Connect メソッド
+
+このメソッドは、対象への接続を作成します。`@Connect` メソッドは、コネクタが起動するときや、API への接続が失われて再確立する必要がある場合、Mule によって自動的にコールされます。このメソッドの完了時に認証に成功していれば、コネクタインスタンスは操作を実行する準備が整っています。
+
+`@Connect` アノテーション付きメソッドは、次の要件を満たしている必要があります。
+
+* 公開である
+* `org.mule.api.ConnectionException` をスローする (他の例外はない)
+* 戻り値のデータ型が `void` である
+* 1 つのメソッドにのみ `@Connect` アノテーションを付加する
+* `@Connect` メソッドに `@TestConnectivity` アノテーションを付加する
+* 1 つ以上のパラメータに `@ConnectionKey` アノテーションを付加する
+
+実際の接続を実装する具体的なコードは、API によって異なります。`@Connect` メソッドの実装例を次に示します。
+
+[source,java,linenums]
+----
+@Connect
+@TestConnectivity
+   public void connect(@ConnectionKey String username, @Password String password)
+     throws ConnectionException {
+        try{
+           setClient(new SendGrid(username, password));
+        }catch(Exception e){
+           throw new ConnectionException(INCORRECT_CREDENTIALS,”” , e.getMessage());
+        }
+      }
+----
+
+このメソッドの必須パラメータは、認証に必要なログイン情報 (このケースではユーザ名とパスワード) です。このメソッドは、`@Connect` アノテーションが付加されているため、Anypoint DevKit はこれらのパラメータをこのコネクタの設定要素 (`@Configurable` 項目を伴う) とメッセージプロセッサ (フローにドラッグされている場合) の両方で使用できるようにします。指定されたログイン情報は、設定要素で設定されているログイン情報よりも優先されます。
+
+=== @TestConnectivity
+
+`@TestConnectivity` アノテーションを使用すると、コネクタの設定時に Anypoint Studio にボタンが表示されます。このボタンにより、ユーザは各自の設定で接続に成功するかどうかをテストできます。
+
+`@TestConnectivity` は、`@Connect` メソッドを実行して `org.mule.api.ConnectionException` を期待します。この例外が発生すると、テストは失敗します。発生しなかった場合は、接続に成功したとみなされます。
+
+`@TestConnectivity` は、設定で簡単に無効にできます。
+
+[source,java,linenums]
+----
+@TestConnectivity(active = false)
+----
+
+=== @ConnectionKey と接続プーリング
+
+上記の例では、`@Connect` メソッドの username パラメータに `@ConnectionKey` アノテーションが付加されています。プールが有効になっていると、必要に応じてコールの実行で使用される同時接続のプールが Mule で保持されます。
+
+`@ConnectionKey` アノテーションは、この項目が接続プール内のこの特定の接続のキーとして使用されることを示すため、このユーザ名の接続が作成されてプールに追加されると、要求ごとに作成されずに再利用されます。
+
+==== 接続キーの選択
+
+ユーザ名/パスワード認証の場合、`@ConnectionKey` としてユーザ名を選択することは明白です。他のプロトコルの場合、サービスに接続する各種ユーザおよびアクセス権限に最も明白に関連する値を識別し、この値を `@ConnectionKey` として使用します。
+
+=== @Disconnect メソッド
+
+このアノテーションは、接続を破棄する `@ConnectionManagement` クラス内のメソッドを示します。このメソッドは、コネクタをシャットダウンするか、接続を明示的に終了したときにコールされます。
+
+`@Disconnect` アノテーション付きメソッドは、次の要件を満たしている必要があります。
+
+* 公開である
+* 入力パラメータを取らない
+* 戻り値のデータ型が `void` である
+* クラスに 1 つの `@Disconnect` アノテーション付きメソッドのみが設定されている
+
+[source,java,linenums]
+----
+@Disconnect
+public void disconnect()
+{
+   if (connection != null)
+   {
+     try
+         {
+         connection.logout();
+         }
+     catch (ConnectionException e)
+         {
+         e.printStackTrace();
+         }
+     finally
+         {
+         connection = null;
+         }
+   }
+}
+----
+
+現在、コネクタの接続が開いている場合、このコードで `connection.logout()` (明示的に認証を解除して接続を閉じるクライアントメソッド) がコールされます。何らかの理由でログアウトに失敗した場合にコネクタでそのコネクタインスタンスの参照が再試行されないように、最終ブロックで接続が引き続き null に設定されます。
+
+=== @ValidateConnection メソッド
+
+このメソッドは、Mule によってコールされ、接続が実際に開いているかどうかをチェックします。
+
+`@ValidateConnection` アノテーション付きメソッドは、次の要件を満たしている必要があります。
+
+* 公開である
+* 入力パラメータを取らない
+* `boolean` または `java.lang.Boolean` を返す
+* クラスの 1 つのメソッドのみに `@ValidateConnection` アノテーションを付加できる
+
+[source,java,linenums]
+----
+@ValidateConnection
+public boolean isConnected()
+{
+    return connection != null;
+}
+----
+
+この例では、接続がアクティブかどうかを判断するために、コードでは単に接続パラメータが null かどうかがチェックされます。プロトコルによっては、他のコネクタで異なる実装が必要になる場合もあります。
+
+=== @ConnectionIdentifier メソッド
+
+このアノテーションは、ログおよびデバッグで使用される、接続の一意の識別子を返す `@ConnectionManagement` クラス内のメソッドを識別します。
+
+`@ConnectionIdentifier` アノテーション付きメソッドは、次の要件を満たしている必要があります。
+
+* 公開である
+* 静的でない
+* 引数を取らない
+* `java.lang.String` を返す
+* 1 つのメソッドにのみ `@ConnectionIdentifier` アノテーションを付加する
+
+次のコードは、識別子として接続の SessionId を返します (使用可能な場合)。このケースの SessionHeader オブジェクトには、API への現在の接続に関するヘッダー情報 (セッション ID など) が含まれます。
+
+[source,java,linenums]
+----
+@ConnectionIdentifier
+public String connectionId() {
+if (connection != null){
+    return connection.getSessionHeader().getSessionId();
+    } else {
+        return  null;
+    }
+}
+----
+
+=== @ReconnectOn アノテーション
+
+このアノテーションにより、`@InvalidateConnectionOn` アノテーションは非推奨になります。1 つの例外だけでなく例外のリストを受信するようになったため、クラスレベルとプロセッサレベルの両方で使用できます。
+
+このアノテーションは、接続に関連する例外処理で使用されます。クラスレベルまたはメソッドレベルで使用できます。コネクタまたはプロセッサがこのクラスの例外をスローすると、`@ReconnectOn` は自動的に接続を無効化します。`@ReconnectOn` は、キャッチされる例外のクラスのリストを受信します (以下の例を参照)。例外が発生すると、`@ReconnectOn` は設定された再接続戦略に基づいて動作します。詳細は、xref:3.7@mule-runtime::configuring-reconnection-strategies.adoc[「再接続戦略の設定」]を参照してください。
+
+[source,java,linenums]
+----
+@Processor
+@ReconnectOn(exceptions = {InvalidSessionFault.class, PasswordChangedException.class})
+public void myOperation(@Optional String source,
+                        @Optional Object destination) throws InvalidSessionFault, PasswordChangedException, InvalidParameterException
+{
+    /**
+    * CODE FOR MY OPERATION
+    */
+}
+----

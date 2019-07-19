@@ -1,0 +1,24 @@
+= @WsdlBodyEnricher
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: soap 本文, コネクタ, soapconnect, enricher, wsdl
+
+DevKit 3.9.0. のリリースでは、`@WsdlBodyEnricher` アノテーションの目的はセッショントークンを SOAP 本文に挿入することです。
+//todo: is it really being injected into the wsdl, or is it called the soap message?
+
+== 実装
+
+`@WsdlBodyEnricher` とマークの付いたメソッドはメッセージペイロードを表すオブジェクトを受信し、セッショントークンで変更してから返します。
+
+[source,java,linenums]
+----
+@WsdlBodyEnricher
+    public Document cookPayload(ServiceDefinition serviceDefinition, String operationName, Document payload){
+        // Customize payload with session token
+    }
+----
+
+== Background (背景)
+
+SOAP ヘッダー修飾子については、この本文の enricher メソッドの呼び出しはすべての接続および初期化のステップが完了した後に行われます。

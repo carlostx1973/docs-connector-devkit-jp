@@ -1,0 +1,24 @@
+= コネクタ機能の拡張
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, 拡張, コネクタ
+
+DevKit でサポートされる次の機能を実装し、コネクタの有効性、効率性、信頼性を向上します。
+
+* xref:adding-datasense.adoc[DataSense の追加]
+** 動的および静的メタデータを検知できるように DataSense をコネクタに追加する方法を学習し、Mule アプリケーションの設計をより直感的になものにして、その負荷を減らします。
+* xref:adding-datasense-query-language.adoc[DataSense Query Language の追加]
+** コネクタでサービスのデータを照会するために使用できるクエリ言語とライブラリについて理解します。
+* xref:adding-query-pagination-support.adoc[クエリページネーションサポートの追加]
+** メモリ内ですべてのレコードを一度に処理することを回避するには、ページネーションを使用します。これにより、コネクタはレコードをチャンクで取り込むことができるようになり、コネクタのパフォーマンスが向上します。コネクタでこの機能を使用するには、サービスの API でページネーションがサポートされている必要があります。
+* xref:building-a-batch-enabled-connector.adoc[バッチ対応コネクタの作成]
+** 2 つのクラスをコネクタのコードに追加して、大量のメッセージを処理し、レコードを容易に検出します。
+* xref:shading-libraries.adoc[ライブラリのシェーディング]
+** 複数バージョンの連動関係が必要であり、それにより Mule の連動関係と競合する可能性があるシナリオでは、JAR ファイルのシェーディング (名前変更) のサポートを追加します。
+* xref:adding-libraries.adoc[コネクタビルドへのライブラリまたは JAR の追加]
+** コネクタにパッケージ化できないライブラリや JAR については、Anypoint Studio でコネクタユーザに要求し、それらを使用してコネクタを作成するようにします。
+
+'''''
+
+*xref:index.adoc[Anypoint コネクタ DevKit に戻る]*

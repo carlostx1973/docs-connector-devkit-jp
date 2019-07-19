@@ -1,0 +1,73 @@
+= HTTP 基本認証 - 非推奨
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, 認証, HTTP 基本
+
+このページでは、HTTP 基本認証に対する DevKit のサポートと、HTTP 認証 https://www.ietf.org/rfc/rfc2617.txt[RFC-2617] を使用して API による認証を行うコネクタを実装する方法について説明します。
+
+HTTP 基本認証は、Web リソースへのアクセス制御を適用するための最も簡単な技術です。これは、静的な標準 HTTP ヘッダーを使用します。つまり、ハンドシェイクを予想して実行する必要はありません。
+
+== 前提条件
+
+このドキュメントは、読者が xref:index.adoc[Anypoint コネクタ DevKit] に精通していて、コネクタに認証を実装する準備が整っていることを前提としています。また、読者がさまざまなxref:authentication-methods.adoc[認証方法]に精通しており、HTTP 基本認証を使用して API による認証を行っていることを前提とします。
+
+== @HttpBasicAuth アノテーション
+
+コネクタに HTTP 基本認証を実装するには、新しいクラスを作成し、そのクラスに @HttpBasicAuth のアノテーションを付加する必要があります。
+
+次の表で `@HttpBasicAuth` アノテーションのすべてのパラメータについて説明します。
+
+[%header,cols="4*a"]
+|===
+|パラメータ |説明 |必須かどうか |デフォルト値
+|*friendlyName* |コネクタ設定ポップアップに表示される名前を定義します。 |✓ |
+|*configElementName* |Mule アプリケーションで使用される設定の名前を定義します。 |  |config
+|*headerName* |Base64 でエンコードされたユーザ名とパスワードを含むヘッダーの名前。 |  |Authorization (承認)
+|*prefix* |ユーザ名とパスワードを Base64 にエンコードする前にプレフィックスを使用します。 |  |Basic
+|===
+
+== @Connector クラスへの @HttpBasicAuth の追加
+
+[source,java,linenums]
+----
+@Connector(name = "connector")
+public class MyConnector
+{
+   @Config
+   private HttpBasicAuthStrategy strategy;
+
+   @Processor
+   @Restcall(uri = "https://someuri.com/api/method", method = HttpMethod.POST)
+   public abstract String method(@RestPostParam("parameter")String param);
+}
+
+@HttpBasicAuth(configElementName="http-ba-config", friendlyName="HTTP Basic Auth")
+public class HttpBasicAuthStrategy
+{
+   @Configurable
+   @BasicAuthUsername
+   private String username;
+
+   @Configurable
+   @BasicAuthPassword
+   private String password;
+}
+----
+
+=== 必須の @HttpBasicAuth クラスプロパティ
+
+上記のコネクタを使用する場合、ユーザが自分のユーザ名とパスワードを指定できるように、戦略クラスに `@Configurable` インスタンスプロパティが必要です。
+
+* `@BasicAuthUsername` はユーザ名を保持します。
+* `@BasicAuthPassword` はパスワードを保持します。
+
+*重要*: これらのインスタンス変数に公開 getter と setter があることを確認してください(表示されていません)。
+
+=== @Restcall @Processor 専用の @HttpBasicAuth (非推奨)
+
+HTTP 基本認証は、静的な標準 HTTP ヘッダーを使用して要求を実行する場合にユーザ名とパスワードを提供する HTTP ユーザエージェント向けの方法です。この認証方法は、REST コール操作でのみ使用できます。
+
+== 関連情報
+
+xref:authentication.adoc[認証]

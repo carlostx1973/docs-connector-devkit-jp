@@ -1,0 +1,38 @@
+= WSDL 操作の絞り込み
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: wsdl, 操作の絞り込み, soap 接続, セッション管理
+
+//todo: make sub-item of https://docs.mulesoft.com/anypoint-connector-devkit/v/3.9/creating-a-soap-connector#coding-with-wsdlprovider ?
+
+== はじめに
+特定の `ServiceDefinition` では、開発者は、WSDL ファイルで定義されている個々の操作を除外する (つまりコネクタユーザに表示しない) ことができます。
+
+アプリケーション開発者に公開する操作ドロップダウンからログイン/ログアウト操作を除外するには、この絞り込みが必要です。
+//todo: is it that certain operations in the service should not require login/logout, such as pinging the server
+
+== 実装
+
+除外した一連の操作は `ServiceDefinition` にリストされる必要があります。これにより、アプリケーション開発者の使用を禁止する必要がある操作は、メタデータキーの取得プロセスで DevKit により効果的に無視されます。
+
+[source,java,linenums]
+----
+@WsdlServiceRetriever
+    public ServiceDefinition getServiceDefinition() {
+           ServiceDefinition service = new DefaultServiceDefinition(
+                          "ServiceId", "tshirt", "tshirt.wsdl","TshirtService","TshirtServicePort");
+
+           service.setExclusions(Arrays.asList("login", "logout"));
+
+            // Exclusions can also be set as:
+            // service.excludeOperation("myUnwantedOp");
+
+            return service;
+    }
+----
+
+除外した操作に一致するメタデータキーは、`getMetaDataKeys()` の呼び出しを介してメタデータキーが返される前に削除されます。
+
+== 関連情報
+メタデータ取得の基礎をxref:adding-datasense.adoc#metadata-retrieval[こちら]でもう一度ご確認ください。

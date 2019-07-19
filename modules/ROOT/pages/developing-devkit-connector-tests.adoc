@@ -1,0 +1,152 @@
+= DevKit コネクタテストの開発
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, コネクタ, テスト, データ検証, api
+
+DevKit ではテストの記述は強制されませんが、開発プロセスの一環としてコネクタの単体テストと機能テストを開発する必要があります。適切なテストスイートなしで、コネクタを本番の準備が整ったとみなすことはできません。
+
+テスト戦略はユーザの特定のニーズに応じて大きく変わる可能性がありますが、このドキュメントでは、コネクタのテスト方法をサポートするために Mule と DevKit で何を使用できるかについての基本を説明します。
+
+== 前提条件
+
+このドキュメントの前提条件を次に示します。
+
+* Anypoint コネクタ DevKit プラグインがxref:creating-an-anypoint-connector-project.adoc[「Anypoint コネクタプロジェクトの作成」]の説明に従ってインストールされている。
+* xref:5@studio::index.adoc[Anypoint Studio] に精通している。
+* Java 用の https://maven.apache.org/[Maven] ビルドマネージャに精通している。
+* http://junit.org/[JUnit] に精通している。
+
+== テストするコード領域
+
+テストスイートに次の種類のテストを組み込みます。
+
+* *入力データの検証:*
+** コネクタでユーザパラメータまたは別のアプリケーションからのパラメータを受け入れる場合、入力に対して一貫性チェックを実行します。クラウドサービスで使用されるパラメータは省略できますが、その他のパラメータは特定のルールに従う必要があります。
+** 有効または無効な入力をコネクタの各メソッドに割り当てる単体テストを実装し、それに従って入力規則が応答することを確認します。
+* *API インタラクション:*
+** コネクタがインターネット経由でリモートサービスと通信している場合、接続または通信のエラーを処理します。通常は、再試行するか、明らかな例外をスローして、エラーを処理します。
+** 選択したエラー処理戦略の種別に関係なく、エラー処理をテストします。
+** Web サービスのテストのモックアップを作成します。
+** コネクタが本番対象ではなくテストエンドポイントを参照するようにして、タイムアウトや接続の損失など、エラー条件をより容易に再現できるようにします。
+* *Mule ESB インテグレーション:*
+** コネクタのテストスイートですべての操作を対象とします。つまり、各操作とパラメータを少なくとも 1 回テストします。
+** 操作ごとに合理的なすべての入力を渡し、出力を受け取ります。
+** 特に注意が必要なことは、XML で操作に渡すまたは操作から受け取る複雑なデータ型を対象とすることです。このデータ型は厄介な場合があります。
+** XML のデフォルトのパラメータ値と省略可能なパラメータ値の使用をテストして、それらが期待どおりに動作することを確認します。
+** コネクタで例外が発生することが予想されるケースをテストします。
+* *Anypoint Studio インテグレーション:*
+** Studio でのコネクタの外観と使いやすさをテストします。
+** プロパティダイアログでの動作と指示や、Javadoc コメントから生成されたツールチップなどを含めます。これをテストする唯一の方法は、Studio でコネクタを手動で使用することです。
+
+== テストスキャフォールディングの生成
+
+テストスキャフォールディングは、Anypoint Studio を使用してテストを生成した後に `src/test/java` の下に含まれる Java ファイルのセットです。Studio は以下のファイルを生成します。
+
+=== テストランナー - 一連のテストケースの実行
+
+* 回帰テストスイートファイル - このコードを使用すると、コネクタの以前の状態を現在の状態と比較して、新しいバグを明らかにできます。これが最初の実行の場合、新しいバグが見つかります。
+* スモークテストスイートファイル - 「この機能は動作するか?」などの簡単な問題を明らかにして、コネクタの基本動作が期待どおりに機能することを確認できます。
+
+=== 回帰テストとサニティテストのレベル
+
+* テストケースオートメーション Java ファイル - コネクタのメソッドごとにテストスキャフォールディングを作成します。
+* 省略可能なテストデータファイル - コネクタのテストデータを提供します。
+
+=== テストケーススキャフォールディングの作成方法
+
+. Package Explorer でプロジェクトを右クリックし、*[Anypoint Connector (Anypoint コネクタ)]* > *[Generate Tests (テストを生成)]* をクリックします。
++
+image::generatetests.png[GenerateTests]
++
+. 作成するテストスキャフォールディングの対象のメソッドをクリックするか、*[Select All (すべて選択)]* をクリックします。アプリケーション内でテスト準備ができているメソッドの選択肢がウィザードに表示されます。目的のメソッドが見つからない場合は、関数に適切なアノテーションを付加したこと、たとえば、メソッドの上に `@Processor` を配置したことを確認します。
++
+image::testscaffoldinggeneration.png[TestScaffoldingGeneration]
++
+. *[Generate Test Case Scaffolding (テストケーススキャフォールディングを生成)]* をクリックして、スキャフォールディングファイルを作成します。
+. コネクタのテストに使用できるテストデータを Studio で作成する必要がある場合、追加の選択肢をクリックします。
+** *Generate Functional Test Data Files (機能テストデータファイルの生成)*
+** *Generate Interop Test Data Files (相互運用テストデータファイルの生成)*
+. *[Finish (完了)]* をクリックします。ファイルが作成されて Package Explorer の `src/test/java` の下に表示されます。
+. コードをスキャフォールディングテストに追加します。テストを実行するには、「Running Generated Tests (生成したテストの実行)」を参照してください。
+
+=== スキャフォールディングファイルの例
+
+テストの例:
+
+[source,java,linenums]
+----
+package org.mule.modules.automation.testcases;
+import org.junit.After;
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
+public class EnterTimeOffTestCases
+    extends myTestFunctionalParent
+{
+    public void setup() {
+        //TODO: Add setup required to run test or simply remove method
+    }
+    @After
+    public void tearDown() {
+        //TODO: Add code to reset sandbox state to the one before the test was run or simply remove method
+    }
+    @Category({
+        RegressionTests.class,
+        SmokeTests.class
+    })
+    @Test
+    public void testEnterTimeOff(){
+        //getConnector() gives back an instance of the current connector
+        //Object result = getConnector().connectorMethod();
+    }
+}
+----
+
+「TODO」のステートメントをテスト用のコードに置き換える必要があります。このスキャフォールディングでは、テストは実行されません。また、エラーやアサーションの失敗も一切発生しません。
+
+== テスト手順
+
+DevKit のテスト手順では、以下の機能が提供されます。
+
+=== 目的
+
+* コネクタに統合されたオートメーションテストスイート。
+* テストの実行時に実際の Sandbox と Mule サーバを使用します。
+* オートメーションテストスイートのメンテナンスは最小限にする必要があります。
+* 古いオートメーションスイートは開発に影響を及ぼしません。
+
+=== テスト作成条件
+
+* 各テストがスイートの残りから確実に分離されるようにした状態で、テストごとに 1 つの Mule インスタンスを起動および完了します。
+* `setUp() メソッドでは、実際のテストを実行する前のテスト環境を作成します。エンティティは、操作のテストのみを目的として作成します。
+* テストには、可能なすべてのエンティティとその量 (該当する場合) をサポートするための十分な柔軟性が必要です。また、テストは、操作に関してビジネスロジックの変更が発生した場合や、(署名の変更など) 操作自体が変更された場合にのみ更新する必要があります。
+* テストはテスト自体でクリーンアップを実行する必要があります。Sandbox はテストの実行前の状態にします。
+* テストでは、一度に 1 つの項目のみをテストする必要があります。
+
+=== 対象範囲のカテゴリ
+
+* スモークテストスイートでは、回帰実行の前提条件が満たされているかどうかをテストします。
+* 回帰スイートには、操作ごとに少なくとも 1 つのテストケースを含めます。
+* https://mulesoft.github.io/connector-testing-framework/[コネクタテストフレームワーク]を使用して機能テストを作成します。
+
+== スイートの実装
+
+=== テスト開発環境のセットアップ
+
+コネクタを構築したら、`target/generated-sources/mule` をプロジェクトのビルドパスに追加します。コネクタによっては、他の生成済みソースをビルドパスに追加しなければならない場合があります (`target/generated-sources/cxf` など)。
+
+コネクタが *Standard* の場合、`muleLicenseKey.lic` ファイルを `src/test/resources` フォルダに追加し、変更をコミットする前にそのファイルを削除してください。
+
+==== パッケージとファイル
+
+* `org.mule.modules.<connector-project>.automation` - <Connector>TestParent と、SmokeTests および RegressionTests カテゴリのインターフェースが含まれます。
+* `org.mule.modules.<connector-project>.automation.testrunners` - ランナー (`RegressionTestSuite` および `SmokeTestSuite`) が含まれます。
+* `org.mule.modules.<connector-project>.automation.testcases` - 機能テストケースのみが含まれます。
+* `<connector-project>/src/test/resources` - ログイン情報が含まれます。
+** `automation-credentials.properties`
+
+== 次のステップ
+
+コネクタに操作を追加しながら個々の単体テストを開発している場合、開発プロセスに戻る必要があります。Maven を使用してコネクタプロジェクトを構築します。いずれかのテストが失敗した場合、Maven 構築プロセスが失敗します。
+
+テストスイートが完了したら、コネクタ用のxref:connector-reference-documentation.adoc[完全なドキュメントとサンプルを生成]できます。

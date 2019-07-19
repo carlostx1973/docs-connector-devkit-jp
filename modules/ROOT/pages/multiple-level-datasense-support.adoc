@@ -1,0 +1,254 @@
+= 複数レベルの DataSense サポート
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, DataSense, 複数レベル, 複数レベル
+
+前に説明したように、Mule DataSense とはサービスに含まれるエンティティのメタデータをわかりやすく表示できる機能です。デフォルトの設定では、DataSense は単一キーを使用して MetaData を取得する必要があるエンティティを識別します。この単一キーを使用する方法は、MetaData を使用して記述されるエンティティがネストされて識別され、複数の識別子がほとんどの場合は密接に関連付けられ、以前に選択されたキーに基づいて選択ツリーが作成されるような複雑なケースでは足枷となる場合があります。
+
+たとえば、世界にある州の 1 つを記述する場合、その州の名前が含まれる単一キーでは一意に識別するには不十分になる可能性があります。「地域->国->州」とネスト化された組み合わせのほうが州にはより適した ID になるでしょう。この場合、ユーザは最初に地域を選択し、次にその地域から選択可能な中から国を選択して、最後に、前に選択した国で州を選択します。
+
+DevKit 3.7 以降では、MultiLevel DataSense のサポートが追加されています。この機能により、開発者は複数レベルのネストされたキーのセットを簡単に定義できるため、ユーザがエンティティの複合キーを選択するのがはるかに容易になります。
+
+== Multi-Level DataSense サポートの追加
+
+コネクタ開発者は、ネストされたレベルを使用してメタデータを記述し、各レベルのキーを定義できます。コネクタを開発するときに、複数の複合キーを使用して MetadataKeyRetriever を記述し、後でこのキーを単一オブジェクトとして MetadataRetriever で処理することができます。  各プロセッサでは、各レベルの表示ラベルを含めて単一の複合キーを宣言できます。
+
+これにより、エンティティをよりきめ細かく記述でき、デザイン時にコネクタが使用しやすくなります。
+
+=== コネクタ開発者の使用法
+
+このセクションでは、メタデータカテゴリおよびメタデータキーパラメータの実装について説明します。
+
+==== @MetaDataCategory の実装
+
+複数レベルのキーを使用する MetaDataCategory を実装すると、デフォルトの方法が次のように変更されることになります。
+
+* @MetaDataKeyRetriever は `List<ComposedMetaDataKey>` を返す必要がある。ComposedKeys を使用するカテゴリはこの種類のキーしか返せません。
+* @MetaDataRetriever は単一の ComposedMetaDataKey を受信する必要がある。 +
+
+デフォルトの keySeparator "||" が使用する keyId 内で有効な組み合わせである可能性がある場合、@MetaDataKeyRetriever はレベルを連結するときに使用するカスタム keySeparator を使用して設定できます。
+
+[source,java,linenums]
+----
+@MetaDataCategory
+public class CustomSeparatorComposedKeyCategory {
+
+    // Common Category Setup
+    // ...
+    private static final int REGION = 0;
+    private static final int COUNTRY = 1;
+    private static final int STATE = 2;
+
+    @MetaDataKeyRetriever( keySeparator="@@" )
+    // keySeparator is Optional, with a default value of '||'
+    public List<ComposedMetaDataKey> getMetaDataKeys() throws Exception {
+
+      return ComposedMetaDataKeyBuilder.getInstance()
+           .newKeyCombination()
+             .newLevel() // Region
+               .addId("south", "South America") // Added to Dropdown 1
+             .endLevel()
+             .newLevel() // Country
+               .addId("arg", "Argentina") // Added to Dropdown 2
+             .endLevel()
+             .newLevel() // State
+               .addId("bsas", "Buenos Aires") // Added to Dropdown 3
+               .addId("tucu", "Tucuman") // Added to Dropdown 3
+             .endLevel()
+           .endKeyCombination()
+           .newKeyCombination()
+             .newLevel() // Region
+               .addId("north", "North America") // Added to Dropdown 1
+             .endLevel()
+             .newLevel() // Country
+               .addId("usa", "United States") // Added to Dropdown 2
+             .endLevel()
+             .newLevel() // State
+               .addId("ny", "New York") // Added to Dropdown 3
+               .addId("ca", "California") // Added to Dropdown 3
+             .endLevel()
+           .endKeyCombination()
+         .build();
+    }
+
+
+    @MetaDataRetriever
+    public MetaData getMetaData(ComposedMetaDataKey composedKey) throws Exception {
+        DefaultMetaDataBuilder builder = new DefaultMetaDataBuilder();
+        MetaDataModel model;
+
+        // A valid key would be: south@@arg@@tucu
+        if (composedKey.getSortedIds().get(REGION).equals("south")) {
+            model = builder.createDynamicObject("TravelData")
+                             .addList("mainCities").ofSimpleField(DataType.STRING)
+                             .endDynamicObject()
+                         .build();
+        } else {
+            model = builder.createDynamicObject("BusinessData")
+                             .addList("mainBanks").ofSimpleField(DataType.STRING)
+                             .endDynamicObject()
+                         .build();
+        }
+        return new DefaultMetaData(model);
+    }
+}
+----
+
+==== @MetaDataKeyParam の実装
+
+@MetaDataKeyParam は *labels* 属性を宣言する必要があり、ドロップダウンとして Studio に表示する各 DataSense レベルの表示ラベルを宣言します。表示ラベルはドロップダウンの「名前」です。
+
+[source,java,linenums]
+----
+@Processor
+@MetaDataScope( CustomSeparatorComposedKeyCategory.class )
+public Map<String,Object> addEntity(
+            @MetaDataKeyParam( labels={"Region", "Country", "State"} ) String key,
+            @Payload Map<String,Object> entity)
+{
+    //...
+}
+----
+
+=== 制限
+
+* keySeparator には次の文字は使用できません: `#[]`。
+* 表示ラベルにはカンマ (,) 文字は使用できません。
+* 表示ラベルの数は MetaDataKeyRetriever メソッドによって指定されるキーレベルの数に一致する必要があります。
+
+=== ビルダーの詳細: 複数のキーの組み合わせを作成する方法
+
+==== Fluent Builder
+
+Fluent Builder を使用して、すべての情報が 1 行作成で使用できるシナリオで複数のキーの組み合わせを作成します。
+
+次の例で、予想される ID の出力は次のようになります。
+
+[source,text,linenums]
+----
+south||arg||bsas, south||arg||tucu, north||usa||nyc, north||usa||ca
+----
+
+前のスクリーンショットで示しているように、3 つのドロップダウンが Anypoint Studio に表示されます。
+
+* 一番上のドロップダウンには「South America (南米)」と「North America (北米)」が表示されます。
+* 最初の選択に応じて、2 番目のドロップダウンにはオプションとして「Argentina (アルゼンチン)」または「United States (米国)」が表示されます。
+* 3 番目のドロップダウンには、2 番目のドロップダウンで [Argentina (アルゼンチン)] を選択した場合は「Buenos Aires (ブエノスアイレス)」と「Tucuman (トゥクマン)」が、2 番目のドロップダウンで [United States (米国)] を選択した場合は「San Francisco (サンフランシスコ)」と「Los Angeles (ロサンゼルス)」が表示されます。
+
+[source.java]
+----
+return ComposedMetaDataKeyBuilder.getInstance()
+.newKeyCombination()
+    .newLevel().addId("south", "South America").endLevel()
+    .newLevel().addId("arg", "Argentina").endLevel()
+    .newLevel().addId("bsas", "Buenos Aires").addId("tucu", "Tucuman")
+.endKeyCombination()
+.newKeyCombination()
+    .newLevel().addId("north", "North America").endLevel()
+    .newLevel().addId("usa", "United States").endLevel()
+    .newLevel().addId("nyc", "New York").addId("ca", "California").endLevel()
+.endKeyCombination()
+.build();
+----
+
+=== 部分レベル定義を使用した Fluent Builder
+
+Fluent Builder を使用した最初の方法と同じように、部分レベルの定義によって、キーを構築するときにコードを再利用できるようになります。
+
+次の例で、予想される ID の出力は次のようになります。
+
+[source,java,linenums]
+----
+id1||common1, id1||common2, id1||sub1,
+id2||common1, id2||common2, id1||sub1,
+id3||common1, id3||common2, id3||sub2, id3||sub3
+----
+
+[source,java,linenums]
+----
+// Partial Level definition
+MetaDataKeyLevel commonIds = new DefaultMetaDataKeyLevel();
+commonIds.addId("common1", "Common 1")
+                   .addId("common2", "Common 2");
+
+return ComposedMetaDataKeyBuilder.getInstance()
+    .newKeyCombination()
+      .newLevel()
+        .addId("id1", "Commons With Subset_1").addId("id2", "Commons With Subset_2")
+      .endLevel()
+      .newLevel()
+        .addIds(commonIds) // Partial Level re-use
+        .addId("sub1", "SubLevel 1")
+      .endLevel()
+    .endKeyCombination()
+    .newKeyCombination()
+        .newLevel()
+ .addId("id3", "Commons With Subset_3")
+ .endLevel()
+        .newLevel()
+          .addIds(commonIds) // Partial Level re-use
+          .addId("sub2", "SubLevel 2")
+          .addId("sub3", "SubLevel 3")
+        .endLevel()
+    .endKeyCombination()
+    .build();
+----
+
+==== Detached Builder
+
+各ノードを個別に構築し、構築の最終段階ですべてをマージします。構築中のすべてのキーはビルダーに保存され、構築が実行されたら連結されます。
+
+[source,java,linenums]
+----
+ComposedMetaDataKeyBuilder metaDataKeyBuilder = ComposedMetaDataKeyBuilder.getInstance();
+
+ComposedMetaDataKeyBuilder.CombinationBuilder firstCombinationBuilder = metaDataKeyBuilder.newKeyCombination();
+firstCombinationBuilder.newLevel().addId("id1", "ID1").endLevel();
+
+ComposedMetaDataKeyBuilder.LevelBuilder levelBuilder = firstCombinationBuilder.newLevel();
+for (String id : Arrays.asList(new String[]{"sub1", "sub2", "sub3"})) {
+    levelBuilder.addId(id, id.toUpperCase());
+}
+levelBuilder.endLevel();
+firstCombinationBuilder.endKeyCombination();
+
+ComposedMetaDataKeyBuilder.CombinationBuilder secondCombinationBuilder = metaDataKeyBuilder.newKeyCombination();
+secondCombinationBuilder.newLevel().addId("id2", "ID2").endLevel();
+
+levelBuilder = secondCombinationBuilder.newLevel();
+for (String id : Arrays.asList(new String[]{"sub1", "sub4", "sub5"})) {
+    levelBuilder.addId(id, id.toUpperCase());
+}
+levelBuilder.endLevel();
+secondCombinationBuilder.endKeyCombination();
+
+
+// Expected IDs output is: id1||sub1, id1||sub2, id1||sub3, id2||sub1, id2||sub4, id2||sub5
+
+return metaDataKeyBuilder.build();
+----
+
+== Mule アプリケーション開発者の使用法
+
+コネクタユーザには、ComposedKey を使用する操作を選択するときに複数のドロップダウンが表示されます。各ドロップダウンは異なるメタデータレベルを表しており、キーのセットが関連付けられています。低いレベルが直接前の選択に関連付けられるため、レベルは順番に入力する必要があります。
+
+上で実装したプロセッサを使用する場合、Anypoint Studio はユーザ向けに次のビューを表示します。
+
+image::mladdentry.png[MLAddEntry]
+
+すべてのレベルが入力されると、最後のキーが作成され、そのキーのメタデータが取得されます。
+
+image::full-dropdown-sample.png[full_dropdown_sample]
+
+XML では、このキーは単一文字列として配置され、各レベルが上記の keySeparator ごとに隔離されます。
+
+[source,xml,linenums]
+----
+<sample-connector:operation config-ref="config" myKey="north@@usa@@ca"/>
+----
+
+=== 関連情報
+
+* xref:5@studio::datasense.adoc[DataSense]
+* xref:adding-datasense.adoc[DataSense の追加]

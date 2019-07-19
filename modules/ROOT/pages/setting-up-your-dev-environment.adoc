@@ -1,0 +1,91 @@
+= 開発環境のセットアップ
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, セットアップ, Studio, Maven, devkit プラグイン, プラグイン, com.sun.tools
+
+このトピックでは、Anypoint コネクタを開発するために必要なすべてのコンポーネントが含まれる開発環境を準備する方法について説明します。
+
+== 前提条件
+
+次のコンポーネントがローカル環境にインストールされていて、機能する必要があります。
+
+* Java コードをコンパイルして構築するための http://www.oracle.com/technetwork/java/javase/archive-139210.html[Java Development Kit (JDK)] *バージョン 7 または 8*
+* プロジェクトの構築を管理するための <<Apache Maven>>
+* コネクタを構築してテストするための IDE としての https://www.mulesoft.com/platform/studio[Anypoint Studio]
+* Anypoint DevKit プラグイン
+
+以下のセクションでは、コネクタ開発環境をセットアップするために必要な詳細を具体的に説明しています。
+
+== Anypoint Studio
+
+Maven サポートと一緒に Java IDE を使用することはできますが、*Anypoint Studio* を使用することを強くお勧めします。Anypoint Studio によってコネクタを構築するために必要なステップのいくつかが合理化され、簡略化されます。
+
+[NOTE]
+コネクタプロジェクトを構築するには、最初に Anypoint コネクタ DevKit アドオンを Anypoint Studio にインストールする必要があります。
+
+まだ Anypoint Studio をインストールしていない場合、xref:3.7@mule-runtime::installing.adoc[詳細な手順]に従ってインストールしてください。Anypoint Studio の簡単な概要として、xref:5@studio::index.adoc[「Anypoint Studio の基礎」]を参照してください。
+
+== JDK
+
+Oracle は Windows、Mac OS X、Linux を含むサポートされるすべてのプラットフォーム用に Java Development Kit (JDK) を無料で公開しています。プラットフォームに応じて&#8203;http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html[バージョン 7] または&#8203;http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html[バージョン 8] をダウンロードしてインストールしてください。
+
+JRE ではなく JDK の場所を参照するように Anypoint Studio を設定する必要があります。JDK を Anypoint Studio のインストール済み JRE として設定する手順は、次のとおりです。
+
+. Anypoint Studio を開きます。
+. [Preferences (プリファレンス)] を開きます。
+** *Windows* および *Linux*: [Window (ウィンドウ)] > [Preferences (プリファレンス)]。
+** *Mac*: [Anypoint Studio] > [Preferences (プリファレンス)]。
+. *[Java]* を展開します。
+. *[Installed JREs (インストール済み JRE)]* を選択します。
+. Anypoint Studio が JDK ではなく JRE を参照している場合、レコードを編集して JDK インストールのルートにマップし直します。
+
+image::installed-jres-jdk.png[インストール済み jre]
+
+NOTE: JDK ではなく JRE のルートを参照している場合、Maven は DevKit に必要な連動関係 `com.sun:tools:jar:1.6` を解決できなくなります。構築プロセスの開始時に、この連動関係を解決できないことを示すエラーがコンソールに表示されます。
+
+== Apache Maven
+
+Apache Maven には、Anypoint Studio がコネクタプロジェクトを構築するために使用するビルドマネージャが用意されています。
+
+概念および基本的なコマンドの簡単な概要については、&#8203;http://maven.apache.org/guides/getting-started/maven-in-five-minutes.html[「Maven in Five Minutes (5 分でわかる Maven)」]を参照してください。
+
+. http://maven.apache.org/download.cgi[Apache Maven ダウンロードページ]から Maven ディストリビューションをダウンロードします。
++
+*重要*: Windows で使用する場合は、Maven 3.1.1 のみをダウンロードします。これは、Apache Maven http://maven.apache.org/download.cgi[ダウンロードページ]を下にスクロールすれば見つかります。
+. ダウンロードしたファイルをローカルドライブのフォルダに開きます。
+. `M2_HOME` という環境変数を作成し、Maven を開くフォルダに設定します。
+. Maven バイナリへのパスが含まれるように `PATH` 環境変数を更新します。
+** *Windows*: PATH 変数に `%M2_HOME%\bin` を追加します。
+** *Mac* または *Linux*: PATH 変数に `$M2_HOME/bin` を追加します。
+
+詳細な手順およびインストールオプションについては、Maven ダウンロードページを参照してください。さまざまなプラットフォームの手順がダウンロードリンクの下に表示されます。
+
+== Studio での DevKit プラグインのインストール
+
+DevKit プラグインをインストールする手順は、次のとおりです。
+
+. Studio で DevKit を使用するには、Apache http://maven.apache.org/download.cgi[Maven] をローカルドライブにインストールしておく必要があります。
+.. Maven がインストールされていることを確認するには、Anypoint Studio のプリファレンスを開きます (Mac では *[Anypoint]* > *[Preferences (プリファレンス)]* をクリック、Windows コンピュータでは *[Window (ウィンドウ)]* > *[Preferences (プリファレンス)]* をクリック)。
+.. *[Anypoint Studio]* > *[Maven Settings (Maven 設定)]* に移動し、*Maven インストールのホームディレクトリ*​が Maven をインストールしたディレクトリを参照することを確認します。
+.. *[Test Maven Configuration (Maven 設定をテスト)]* をクリックして Maven が正しく設定されていることを確認します。
+. *Anypoint Studio* の `Help` メニューから、*[Install New Software (新規ソフトウェアをインストール)]* をクリックします。
++
+image::installnewsoftware.png[InstallNewSoftware]
++
+. [Install (インストール)] メニューの *[Work with (使用)]* ドロップダウンメニューで、下向き矢印をクリックして *[Anypoint DevKit Update Site (Anypoint DevKit 更新サイト)]* をクリックします。Anypoint DevKit プラグインのチェックボックスをクリックして、*[Next (次へ)]* をクリックします。
++
+[NOTE]
+ドロップダウンリストに [Anypoint DevKit Update Site (Anypoint DevKit 更新サイト)] が表示されていない場合、*[Add (追加)]* をクリックして次の URL をリポジトリにコピーします。 +
+*場所*: `+http://studio.mulesoft.org/r5/devkit+`
++
+image::devkit-update-site.png[AddOns-Update-Site]
++
+. ウィザードの残りのステップに進み、インストールします。
+. Studio を再起動します。
+
+== 関連情報
+
+* *次へ:* xref:setting-up-api-access.adoc[API アクセスをセットアップ]して次のステップに進みます。
+* xref:creating-an-anypoint-connector-project.adoc[「Anypoint コネクタプロジェクトの作成」]にジャンプします。
+* コーディングを開始する場合は、xref:anypoint-connector-development.adoc[「Anypoint コネクタ開発」]を開発プロセス全体の簡単なガイドとして参照してください。

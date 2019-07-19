@@ -1,0 +1,8 @@
+= アノテーションリファレンス
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, アノテーション, 参照, javadoc
+
+[WARNING]
+DevKit コア Java アノテーションの最新情報については、 http://mulesoft.github.io/mule-devkit/3.8.0/apidocs/index.html[DevKit 3.8 アノテーションリファレンス] を参照するか、 http://mulesoft.github.io/mule-devkit/[こちら]で他のリリースのアノテーションドキュメントにアクセスしてください。

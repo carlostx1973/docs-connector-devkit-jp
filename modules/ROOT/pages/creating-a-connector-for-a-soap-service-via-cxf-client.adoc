@@ -1,0 +1,981 @@
+= CXF クライアントを介した SOAP サービスのコネクタの作成
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, soap, cxf
+
+この例では、WSDL ファイルを指定して SOAP サービスのコネクタを構築する方法について説明します。クライアントは、WSDL メタデータから必要なコードの大部分を生成できる Apache CXF を使用して構築されます。
+
+*サンプル WSDL*: <<Appendix - sunsetriseservice WSDL>>
+
+*注意*:
+
+* Mule 3.5.2 以降、SOAP コネクタの作成時に Anypoint コネクタ DevKit からファイルまたはフォルダのいずれかで必要な WSDL ファイルを指定するように求められます。WSDL により、自動的にコネクタが作成されます。
+* SOAP コネクタを開発する方法は次の 2 つです。
+** xref:creating-a-soap-connector.adoc[「SOAP コネクタの作成」]の説明に従って、Mule 3.5.2 以降の WSDL-to-コネクタアプローチを使用してコネクタを作成する。xref:creating-a-soap-connector.adoc[「SOAP コネクタの作成」]ドキュメントには、Mule 3.7 の変更点の説明とサンプル WSDL が記載されています。
+** WSDL2Java を使用して、<<CXF-Based Connector Architecture>>から開始する。
+* SOAP コネクタを作成したら、このドキュメントの残りのセクションを使用して、Studio で作成するコネクタを拡張して機能を追加できます。
+
+== 前提条件
+
+このドキュメントは、読者が SOAP Web サービス (WSDL 定義を含む) に精通していることを前提としています。WSDL の重要な概念と用語については、&#8203;http://www.w3.org/TR/wsdl20/[W3C Web サイトの WSDL 仕様]を参照してください。
+
+このドキュメントは、読者が CXF と WSDL2Java、およびこれらをどのように使用して Web サービスクライアントを構築するのかについてある程度理解していることも前提としています。これらのトピックの背景情報については、&#8203;http://cxf.apache.org/docs/how-do-i-develop-a-client.html[「Apache CXF: How do I develop a client? (Apache CXF: クライアントの開発方法)」]と特に&#8203;http://cxf.apache.org/docs/developing-a-consumer.html[「Apache CXF: Developing a Consumer with CXF (Apache CXF: CXF を使用したコンシューマの開発)」]を参照してください。また、このドキュメントは、読者がxref:creating-a-java-sdk-based-connector.adoc[「Java SDK ベースのコネクタの作成」]の説明に従ってコネクタの Maven プロジェクトを作成していることを前提としています。
+
+== CXF ベースのコネクタのアーキテクチャ
+
+Apache CXF は、Web サービスにアクセスするためのさまざまなモデルを有効にする複雑なフレームワークです。ここでは、WSDL が設定されているサービスの結果を生成する簡単なパスに焦点を当てます。CXF を使用するクライアントモデルのすべての候補についての詳細は、Apache CXF ドキュメント (http://cxf.apache.org/docs/how-do-i-develop-a-client.html[「building clients (クライアントの構築)」]、特に&#8203;http://cxf.apache.org/docs/developing-a-consumer.html[「Developing a Consumer with CXF (CXF を使用したコンシューマの開発)」]) を参照してください。
+
+開発のモデルを次に示します。
+
+* コネクタを構成するメジャークラスを作成する
+* 認証関連の機能を `@Connector` クラスに追加する
+* テスト駆動型開発プロセスを適用して、個々の操作をコネクタに追加する
+
+このドキュメントの手順に従って、コネクタクライアントを構築します。サービスを記述する WSDL から開始します。
+
+新しいコネクタプロジェクトから開始 (認証ロジックが組み込まれている場合もある):
+
+* サービスの WSDL ファイルを取得し、プロジェクトに追加する。
+* Maven から WSDL2Java を実行して、サービス操作をコールできる CXF スタブクライアントコードを生成する。
+* スタブクライアントをラップするプロキシクラスを作成する。
+* DevKit コネクタクラス (このクラスのメソッドでプロキシクラスのメソッドをコールする) を構築する。
+
+最終的なアーキテクチャは、次のようになります。
+
+image::image2013-8-11-173a213a7.png[image2013-8-11+173A213A7]
+
+== サンプルサービス: SunSetRiseService
+
+デモの Web サービスは、SunSetRise Web サービスです。<<Appendix - sunsetriseservice WSDL>> は、アクセス情報を提供します。
+
+[TIP]
+サンプルファイルは、このドキュメントの後続のセクション用の link:{attachmentsdir}/CxfExampleFiles.zip[CxfExampleFiies.zip] 添付ファイルにあります。
+
+
+要求と応答はどちらも、以下を指定する XML ドキュメントで表されます。
+
+* 場所 (緯度と経度)。南半球では負の緯度値、東半球では負の経度値を使用する必要があります。座標の単位は、度、分、秒ではなく 10 進数になります。
+* 日の出と日の入りの時刻を提供する対象日付。
+* 最終結果のタイムゾーン (GMT からのオフセット)。
+
+日の出と日の入りの時刻を取得する SOAP 1.1 の GetSunSetRiseTime のサンプル要求メッセージを次に示します。
+
+[source,xml,linenums]
+----
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+   xmlns:web="http://www.webserviceX.NET/">
+   <soap:Header/>
+   <soap:Body>
+      <web:GetSunSetRiseTime>
+         <web:L>
+            <web:Latitude>0.0</web:Latitude>
+            <web:Longitude>0.0</web:Longitude>
+            <web:TimeZone>0</web:TimeZone>
+            <web:Day>21</web:Day>
+            <web:Month>3</web:Month>
+            <web:Year>2015</web:Year>
+         </web:L>
+      </web:GetSunSetRiseTime>
+   </soap:Body>
+</soap:Envelope>
+----
+
+SunSetTime と SunRiseTime 要素は、サービスよって計算されるため省略されています。応答には、入力された値が含まれます。
+
+サンプル応答を次に示します。
+
+[source,xml,linenums]
+----
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope
+    xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <soap:Body>
+        <GetSunSetRiseTimeResponse
+            xmlns="http://www.webserviceX.NET/">
+            <GetSunSetRiseTimeResult>
+                <Latitude>0</Latitude>
+                <Longitude>0</Longitude>
+                <SunSetTime>17.9877033</SunSetTime>
+                <SunRiseTime>5.87441826</SunRiseTime>
+                <TimeZone>0</TimeZone>
+                <Day>21</Day>
+                <Month>3</Month>
+                <Year>2015</Year>
+            </GetSunSetRiseTimeResult>
+        </GetSunSetRiseTimeResponse>
+    </soap:Body>
+</soap:Envelope>
+----
+
+SunSetTime と SunRiseTime の単位は、時、分、秒ではなく 10 進数になります。
+
+== WSDL からの CXF スタブクライアントの作成
+
+すべての SOAP API は、SOAP Web サービスをコールする方法、SOAP Web サービスをコールするエンドポイントとポート、想定される操作とパラメータ、操作で返されるデータ型 (単純または複合) を定義する WSDL ファイルを提供します。
+
+CXF には、サービスの任意のメソッドをコールする Java スタブクライアントコードを生成したり、その後の処理のために Java オブジェクトとして要求パラメータや応答をマーシャリング/マーシャリング解除したりできる wsdl2java ユーティリティが含まれます。この生成されるスタブクライアントは、コネクタの中核になります。
+
+以下のセクションでは、スタブクライアントを作成してプロジェクトに追加する手順について説明します。
+
+=== 準備
+
+WSDL は、URL からアクセスするか、ローカルコンピュータにダウンロードできます。コンピュータにダウンロードする場合、コネクタの構築に必要なすべてのファイルがあることを確認してください。
+
+他の API にアクセスするために必要になる可能性がある手順 (WSDL ファイルにアクセスする方法を含む) については、xref:setting-up-api-access.adoc[「API アクセスのセットアップ」]を参照してください。
+
+=== ステップ 1: プロジェクトへの WSDL ファイルの追加
+
+プロジェクトの `/src/main/resources` で、`wsdl` というサブディレクトリを作成し、そこに WSDL をコピーします。
+
+この例では、WSDLを `/src/main/resources/wsdl/sunsetriseservice.wsdl` にコピーします。
+
+*注意*: WSDL をダウンロードする場合、必要なスキーマファイルもローカルにあることを確認してください。
+
+=== ステップ 2: POM ファイルの更新
+
+デフォルトの POM ファイル (Maven によって構築のすべての指示が保存される場所) には、CXF を使用した SOAP のアクセスに固有のプロパティ、連動関係、Maven プラグインは含まれていません。これらは、手動で `pom.xml` ファイルに追加する必要があります。
+
+==== POM への WSDL および CXF プロパティの追加
+
+コードの最初のブロックでいくつかのプロパティを POM を追加します。これらは、使用する CXF バージョンを識別したり、パッケージ名を設定したり、プロジェクトおよびコネクタ JAR ファイルの WSDL の場所を指定したりします。
+
+*SOAP CXF コネクタ: Maven プロパティ*
+
+[source,xml,linenums]
+----
+<!-- Maven should build the update site Zip file -->
+<devkit.studio.package.skip>false</devkit.studio.package.skip>
+
+<!--  CXF version info -->
+<cxf.version>2.5.9</cxf.version>
+<cxf.version.boolean>2.6.0</cxf.version.boolean>
+
+<!-- Package name, WSDL file path and location in the JAR -->
+<connector.package>
+    org.tutorial.sunsetrise.definition
+</connector.package>
+<connector.wsdl>
+    ${basedir}/src/main/resources/wsdl/sunsetriseservice.wsdl
+</connector.wsdl>
+<connector.wsdlLocation>
+    classpath:wsdl/sunsetriseservice.wsdl
+</connector.wsdlLocation>
+----
+
+`<properties>` 要素内にこれらの要素を追加し、WSDL ファイルの名前が反映されるように `connector.wsdl` および `connector.wsdlLocation` を更新します。
+
+==== CXF の Maven 連動関係の追加
+
+2 番目の POM の更新で、Mule に含まれる CXF モジュールの連動関係が追加されます。
+
+*CXF の連動関係*
+
+[source,xml,linenums]
+----
+<dependency>
+    <groupId>org.mule.modules</groupId>
+    <artifactId>mule-module-cxf</artifactId>
+    <version>${mule.version}</version>
+    <scope>provided</scope>
+  </dependency>
+----
+
+コードのこのブロックをコピーし、ファイルの末尾付近にある `<dependencies>` タグ内に、すでにリストされている他の <dependency> 要素と隣り合うように貼り付けます。このブロックは編集する必要はなく、追加するだけです。
+
+==== wsdl2java の Maven プラグインの追加
+
+3 番目の POM の更新は、WSDL ファイルから Java クラスを生成する `wsdl2java` Maven プラグインです。このプラグイン要素を `<build>` 要素内の `<plugins>` 要素に貼り付けます。`<pluginManagement>` 要素内に配置していないことを確認してください。
+
+このブロックは編集する必要はなく、追加するだけです。
+
+*Wsdl2Java*
+
+[source,xml,linenums]
+----
+<plugin>
+    <groupId>org.apache.cxf</groupId>
+    <artifactId>cxf-codegen-plugin</artifactId>
+    <version>${cxf.version}</version>
+    <executions>
+        <execution>
+            <!-- Note that validate phase is not the usual phase to
+              run WSDL2Java. This is done because DevKit requires the
+              class be generated so it can be used in generate-sources
+              phase by DevKit. The DevKit generates code from annotations
+              etc. and references the WSDL2Java generated output.  -->
+            <phase>validate</phase>
+            <goals>
+                <goal>wsdl2java</goal>
+            </goals>
+            <configuration>
+                <wsdlOptions>
+                    <wsdlOption>
+                        <!-- WSDL File Path -->
+                        <wsdl>${connector.wsdl}</wsdl>
+                        <!-- pick up the WSDL from within the JAR -->
+                        <wsdlLocation>${connector.wsdlLocation}</wsdlLocation>
+                        <autoNameResolution>true</autoNameResolution>
+                        <extraargs>
+                            <!-- Package Destination -->
+                            <extraarg>-p</extraarg>
+                            <!-- Name of the output package specified
+                              that follows the -p argument to wsdl2java. -->
+                            <extraarg>
+                                ${connector.package}
+                            </extraarg>
+                                <!-- DataMapper compatibility requires that
+                                boolean getters and setters follow naming
+                                conventions for other getters and setters. -->
+                            <extraarg>-xjc-Xbg</extraarg>
+                            <extraarg>-xjc-Xcollection-setter-injector</extraarg>
+                        </extraargs>
+                    </wsdlOption>
+                </wsdlOptions>
+            </configuration>
+        </execution>
+    </executions>
+    <dependencies>
+        <!-- Boolean Getters -->
+        <dependency>
+            <groupId>org.apache.cxf.xjcplugins</groupId>
+            <artifactId>cxf-xjc-boolean</artifactId>
+            <version>${cxf.version.boolean}</version>
+        </dependency>
+        <!-- Collection Setters -->
+        <dependency>
+            <groupId>net.java.dev.vcc.thirdparty</groupId>
+            <artifactId>collection-setter-injector</artifactId>
+            <version>0.5.0-1</version>
+        </dependency>
+    </dependencies>
+</plugin>
+----
+
+*注意*:
+
+* 追加した `connector.package`、`connector.wsdl`、`connector.wsdlLocation` プロパティは、ここで参照されます。
+* xjc-Xbg 引数は、WSDL2Java で他の Java bean の getter および setter の命名規則に準拠する getter および setter を生成できるようにするために含まれています。これは、DataSense および DataMapper との互換性を確保するために必要になります。
+* WSDL2Java コードの生成は、Maven 検証フェーズで実行されます。WSDL2Java から生成されるコードは、構築プロセスのソース生成フェーズで必要になります。このフェーズでは、DevKit のコード生成でこれらのソースが参照されます。
+
+このチュートリアルで必要な変更が加えられた完全な `pom.xml` ファイルの内容を次に示します。
+
+*完全な POM ファイル*
+
+[source,xml,linenums]
+----
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.mule.modules</groupId>
+    <artifactId>sunsetrise-connector</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>mule-module</packaging>
+    <name>Mule Sunsetrise Anypoint Connector</name>
+
+    <parent>
+        <groupId>org.mule.tools.devkit</groupId>
+        <artifactId>mule-devkit-parent</artifactId>
+        <version>3.6.0</version>
+    </parent>
+    <properties>
+        <cxf.version.boolean>2.6.0</cxf.version.boolean>
+        <!-- WSDL file path and location in the JAR -->
+        <connector.wsdl>
+            ${basedir}/src/main/resources/wsdl/sunsetriseservice.wsdl
+        </connector.wsdl>
+        <connector.wsdlLocation>
+            classpath:wsdl/sunsetriseservice.wsdl
+        </connector.wsdlLocation>
+        <connector.package>
+            org.tutorial.sunsetrise.definition
+        </connector.package>
+        <category>Community</category>
+        <licensePath>LICENSE.md</licensePath>
+        <devkit.studio.package.skip>false</devkit.studio.package.skip>
+    </properties>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>1.7</version>
+                <executions>
+                    <execution>
+                        <id>add-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${basedir}/target/generated-sources/cxf</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- CXF Code generation -->
+            <plugin>
+                <groupId>org.apache.cxf</groupId>
+                <artifactId>cxf-codegen-plugin</artifactId>
+                <version>${cxf.version}</version>
+                <executions>
+                    <execution>
+                        <phase>validate</phase> <!-- This is so it work with the Devkit -->
+                        <goals>
+                            <goal>wsdl2java</goal>
+                        </goals>
+                        <configuration>
+                            <wsdlOptions>
+                                <wsdlOption>
+                                    <!-- WSDL File Path -->
+                                    <wsdl>${connector.wsdl}</wsdl>
+                                    <!-- Pick up the WSDL from within the JAR -->
+                                    <wsdlLocation>${connector.wsdlLocation}</wsdlLocation>
+                                    <autoNameResolution>true</autoNameResolution>
+                                    <extendedSoapHeaders>false</extendedSoapHeaders>
+                                    <extraargs>
+                                        <!-- For DataMapper compatibility, force
+                                     boolean getters and setters to follow
+                                     naming convention for other getters and
+                                     setters. -->
+                                        <extraarg>-xjc-Xbg</extraarg>
+                                        <extraarg>-xjc-Xcollection-setter-injector</extraarg>
+                                        <extraarg>-p</extraarg>
+                                        <extraarg>${connector.package}</extraarg>
+                                    </extraargs>
+                                </wsdlOption>
+                            </wsdlOptions>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <!-- Boolean Getters -->
+                    <dependency>
+                        <groupId>org.apache.cxf.xjcplugins</groupId>
+                        <artifactId>cxf-xjc-boolean</artifactId>
+                        <version>${cxf.version.boolean}</version>
+                    </dependency>
+                    <!-- Collection Setters -->
+                    <dependency>
+                        <groupId>net.java.dev.vcc.thirdparty</groupId>
+                        <artifactId>collection-setter-injector</artifactId>
+                        <version>0.5.0-1</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+        </plugins>
+    </build>
+    <dependencies>
+        <dependency>
+            <groupId>org.mule.modules</groupId>
+            <artifactId>mule-module-cxf</artifactId>
+            <version>${mule.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+    <repositories>
+        <repository>
+            <id>mulesoft-releases</id>
+            <name>MuleSoft Releases Repository</name>
+            <url>http://repository.mulesoft.org/releases/</url>
+            <layout>default</layout>
+        </repository>
+        <repository>
+            <id>mulesoft-snapshots</id>
+            <name>MuleSoft Snapshots Repository</name>
+            <url>http://repository.mulesoft.org/snapshots/</url>
+            <layout>default</layout>
+        </repository>
+    </repositories>
+</project>
+----
+
+=== ステップ 3: 新しい連動関係を使用したプロジェクトの再構築
+
+POM ファイルにこれらが追加されたので、プロジェクトのクリーンビルドとクリーンインストールを実行します。
+
+プロジェクトが存在するディレクトリから、コマンドラインで次の Maven コマンドを実行できます。
+
+[source,text,linenums]
+----
+mvn clean install
+----
+
+このコマンドは Maven を呼び出します。このコマンドには、次の 2 つの目標があります。
+
+* `clean` - 以前のすべてのビルドコンテンツをラップするように Maven に指示する。
+* `install` - WSDL2Java を使用した CXF クライアントコードの生成、プロジェクトのすべてのコードのコンパイル、定義されたテストの実行、Eclipse 更新サイトとしてのコンパイル済みコードのパッケージ化、ローカル Maven リポジトリへのインストールを行うように Maven に指示する。このプロセス中に失敗 (構築やテストの失敗など) が発生すると、Maven は後続の目標を試行しなくなります。
+
+このプロセスについての詳細は、Apache Maven プロジェクトの&#8203;http://maven.apache.org/guides/introduction/introduction-to-the-lifecycle.html[「Introduction to the Build Lifecycle (構築ライフサイクルの概要)」]を参照してください。
+
+希望する IDE でこのプロセスもサポートされている必要があります。たとえば、Eclipse の場合、プロジェクトを選択して、*[Run as (別のユーザとして実行)]* > *[Maven Build (Maven ビルド)]* を呼び出します。
+
+構築が完了したら、Maven が `wsdl2java` を使用して生成したファイルがフォルダ `target/generated-sources/cxf:` に含まれます。
+
+image::sunsetfiles.png[SunsetFiles]
+
+==== IDE ビルドパスへの生成されたソースフォルダの追加
+
+[NOTE]
+前のステップで生成された `target/generate-sources/cxf` ソースフォルダがビルドパスにない場合、以下の手順を実行します。
+
+IDE で識別されるように、前のステップの `target/generated-sources/cxf` フォルダをビルドパスに追加する必要があります。
+
+. xref:creating-a-java-sdk-based-connector.adoc[「Java SDK ベースのコネクタの作成」]の「Eclipse/Mule Studio への Maven プロジェクトのインポート」の説明に従って Maven プロジェクトを IDE にインポートまたは再インポートします。
+. フォルダ `target/generated-sources/cxf` を見つけます。
+. フォルダ名を右クリックし、*[Build Path (ビルドパス)]* > *[Use as Source Folder (ソースフォルダとして使用)]* を選択します。
++
+image::soap1.png[SOAP1]
+
+この作業により、デフォルトでソースコードの一部としてこのフォルダを処理する必要があることが IDE に通知されます。
+
+[NOTE]
+通常、wsdl2java が実行されるたびにこれらのファイルが作成されるため、これらの生成されたクラスは変更しないでください。サービス定義が変更された場合、ローカル WSDLを更新し、次の構築の前に `mvn clean` を実行します。
+
+=== WSDL2Java によって生成されるスタブクライアントコードの理解
+
+生成される Java ソースファイルは、WSDL のコンテンツで記述されているサービスに対応します。
+
+WSDL は、サービスポート (またはエンドポイント) を介してアクセスできるサービスを記述します。各ポートは、特定のプロトコルをサポートし、サービスの一連の操作を公開します。各操作は、WSDL でも定義されている種別のオブジェクト (XML 形式) を受け入れて返します。
+
+WSDL2Java から生成されるコードは、Web サービスの Java スタブクライアント実装を提供します。生成されるコードで定義されているクラスおよびインターフェースは、WSDL で定義されているサービス、ポート、操作、種別に対応します。
+
+この例で最も注目すべき生成コードを次に示します。
+
+* `SunSetRiseService` クラス – サービスに対応する最上位クラス
+* `SunSetRiseServiceSoap` インターフェース – SOAP ポートで使用できる操作に対応する `getSunSetRiseTime()` メソッドを記述するインターフェースを公開します。
+
+これらがあると、数行のコードのみでサービスの任意の操作をコールできます。
+
+* サービスとポートをインスタンス化する
+* 引数を作成する型クラスと応答を Java オブジェクトとして使用して、ポートオブジェクトに対して操作をコールする
+
+[NOTE]
+====
+*CXF および JAX-WS Web サービスアノテーション*
+
+生成されるスタブクライアントコードでは、JAX-WS アノテーションが幅広く使用されるため、完全に理解することがやや難しくなる場合があります。幸いなことに、生成されるこのコードはその詳細を理解しなくても使用できます。使用される個々のアノテーションについての詳細は、&#8203;http://cxf.apache.org/docs/developing-a-service.html#DevelopingaService-AnnotatingtheCode[「Apache CXF: Developing a Service (Apache CXF: サービスの開発)」]を参照してください。
+====
+
+`getSunSetRiseTime()` 操作に緯度/経度/日付データを渡したり、その操作からこれらのデータを返したりするために使用されるオブジェクトを定義するエンティティクラス `LatLonDate` も重要です。
+
+== SOAP プロキシクラスの作成
+
+次に、スタブクライアントをコールするプロキシクラスを構築します。このクラスは、DevKit で自動的に生成されないため、手動でコーディングして生成します。
+
+=== プロキシクライアントクラス定義の作成
+
+ここでは、独自のクラスを作成します。この例では、パッケージ `org.tutorial.sunsetrise.client` で、クラス `SunSetRiseProxyClient` を作成します。
+
+まず、次のインポートを追加します。
+
+[source,java,linenums]
+----
+import java.net.URL;
+import org.mule.api.ConnectionException;
+import org.mule.api.ConnectionExceptionCode;
+import org.tutorial.sunsetrise.definition.SunSetRiseService;
+import org.tutorial.sunsetrise.definition.SunSetRiseServiceSoap;
+import org.tutorial.sunsetrise.definition.LatLonDate;
+----
+
+その後、次のコードをクラス定義に追加します。これにより、サービスおよびポートインスタンスが作成されます。
+
+[source,java,linenums]
+----
+public class SunSetRiseProxyClient {
+        private SunSetRiseServiceSoap port;
+        public SunSetRiseProxyClient() {}
+        public void initialize() throws ConnectionException {
+            SunSetRiseService svc;
+            // Pick up the WSDL from the location in the JAR
+            URL url= SunSetRiseService.class.getClassLoader().getResource("wsdl/sunsetriseservice.wsdl");
+            svc = new SunSetRiseService(url);
+
+            port = svc.getSunSetRiseServiceSoap();
+
+            // Configure Authentication headers here, if the service uses them.
+            // Add parameters as needed to initialize() to pass them
+            // in from your connector
+        }
+
+/* Add operations here */
+}
+----
+
+スタブクライアントのメソッドをコールするために使用されるポートインスタンスを作成する `initialize()` メソッドは、最終的に `@Connector` クラスの `@Connect` メソッドからコールされます。
+
+[NOTE]
+====
+*プロキシクライアントクラスの認証*
+
+この例には、認証は含まれていません。このサンプルで使用される WebserviceX.net の API では、認証は必要ありません。マルチテナントのサポートを提供する接続管理アノテーションが使用されます。
+
+認証をサポートするコネクタのプロキシクラスは、CXF スタブクラスをラップする認証関連のロジックを提供します。たとえば、プロキシクライアントクラスで、ヘッダーや URL パラメータを要求に追加したり、トークンやログイン情報を渡したりすることが必要になる場合もあります。`@Connector` クラスには、後でプロキシクライアントインスタンスに渡されるログイン情報を保持するプロパティが必要です。
+
+xref:authentication-methods.adoc[「認証方法」]には、さまざまな認証方法の説明が記載されています。各自の認証方法を見つけ、プロキシクライアントの認証処理の追加方法のガイダンスとして各例を参照してください。
+====
+
+== `@Connector` クラスの準備
+
+メイン `@Connector` クラスは、前のステップで作成されたクライアントロジッククラスをラップします。このクラスには、Mule コネクタに必要なアノテーションが含まれます。また、コネクタが Mule で公開する操作のメソッドも定義します。
+
+DevKit Maven アーキタイプから作成されたスケルトン `@Connector` クラスは、この作業の開始点です。
+
+*SunsetRiseConnector.java (DevKit で生成)*
+
+[source,java,linenums]
+----
+/**
+ * (c) 2003-2014 MuleSoft, Inc. The software in this package is published under the terms of the CPAL v1.0 license,
+ * a copy of which has been included with this distribution in the LICENSE.md file.
+ */
+
+package org.mule.modules.sunsetrise;
+import org.mule.api.annotations.ConnectionStrategy;
+import org.mule.api.annotations.Connector;
+import org.mule.api.annotations.Processor;
+import org.mule.api.annotations.param.Default;
+import org.mule.modules.sunsetrise.api.LatLonDate;
+import org.mule.modules.sunsetrise.strategy.ConnectorConnectionStrategy;
+
+/**
+ * Anypoint Connector
+ *
+ * No description available
+ *
+ * @author MuleSoft, Inc.
+ *
+ */
+@Connector(name = "sunsetrise", friendlyName = "Sunsetrise", schemaVersion = "1.0")
+public class SunsetriseConnector {
+    /**
+     * Connection Strategy
+     */
+    @ConnectionStrategy
+    ConnectorConnectionStrategy connectionStrategy;
+
+    /**
+     * Get Sunset and Sunrise time for any location in the world<br>
+     * <b>Longitude:</b>Positive in Western Hemisphere,Negative in Eastern Hemisphere<br>
+     * <b>Latitude:</b>Positive in Northern Hemisphere,Negative in Southern Hemisphere
+     *
+     * {@sample.xml ../../../doc/sunsetrise-connector.xml.sample sunsetrise:get-sun-set-rise-time}
+     *
+     * @param in Location to use in the request
+     * @return the Location with the sunset and sunrise time.
+     */
+    @Processor(friendlyName = "Sunset and Sunrise Times")
+    public LatLonDate getSunSetRiseTime(
+        @Default("#[payload]")
+        LatLonDate in) {
+        return connectionStrategy.getClient().getSunSetRiseTime(in);
+    }
+    public ConnectorConnectionStrategy getConnectionStrategy() {
+        return connectionStrategy;
+    }
+    public void setConnectionStrategy(ConnectorConnectionStrategy connectionStrategy) {
+        this.connectionStrategy = connectionStrategy;
+    }
+}
+----
+
+== 接続戦略クラス
+
+Mule 3.6 以降、コネクタで接続戦略が使用されるようになりました。以前の Mule バージョンでは、継承でしか接続戦略を追加できなかったため、設定が難しくなり、新しい DevKit 機能が登場したときに拡張性の問題が発生していました。新しい接続戦略機能では、これらの問題が解決されます。
+
+[source,java,linenums]
+----
+/**
+ * (c) 2003-2014 MuleSoft, Inc. The software in this package is published under the terms of the CPAL v1.0 license,
+ * a copy of which has been included with this distribution in the LICENSE.md file.
+ */
+package org.mule.modules.sunsetrise.strategy;
+import org.mule.api.ConnectionException;
+import org.mule.api.annotations.Connect;
+import org.mule.api.annotations.ConnectionIdentifier;
+import org.mule.api.annotations.Disconnect;
+import org.mule.api.annotations.TestConnectivity;
+import org.mule.api.annotations.ValidateConnection;
+import org.mule.api.annotations.components.ConnectionManagement;
+import org.mule.api.annotations.param.ConnectionKey;
+import org.mule.modules.sunsetrise.api.SunSetRiseProxyClient;
+/**
+ * Connection Management Strategy
+ *
+ * @author MuleSoft, Inc.
+ */
+@ConnectionManagement(configElementName = "config-type", friendlyName = "Connection Management type strategy")
+public class ConnectorConnectionStrategy {
+    private SunSetRiseProxyClient client;
+    /**
+     * Connect
+     *
+     * @param username
+     *            A username. We need a connection key to use connection manager, even if we don't use it internally.
+     * @throws ConnectionException
+     */
+    @Connect
+    @TestConnectivity
+    public void connect(@ConnectionKey String username)
+            throws ConnectionException {
+        client = new SunSetRiseProxyClient();
+        client.initialize();
+    }
+    /**
+     * Disconnect
+     */
+    @Disconnect
+    public void disconnect() {
+        client = null;
+    }
+    /**
+     * Are we connected?
+     */
+    @ValidateConnection
+    public boolean isConnected() {
+        return client != null;
+    }
+    /**
+     * Are we connected?
+     */
+    @ConnectionIdentifier
+    public String connectionId() {
+        return "001";
+    }
+    public SunSetRiseProxyClient getClient() {
+        return client;
+    }
+}
+----
+
+== コネクタへの操作の追加
+
+コネクタに操作を追加するには、次のステップが必要になります。
+
+* 操作で参照されるエンティティクラスをインポートする
+* スタブクライアントをコールするプロキシクラスの操作のメソッドを追加する
+* 新しいプロキシクラスメソッドをコールする `@Connector` クラスに `@Processor` メソッドを追加する
+* 必要な Javadoc (XML スニペットを含む) を `@Processor` メソッドに追加する
+
+状況によっては、`@Configurable` プロパティをコネクタに追加することが必要になる場合もあります。
+
+*注意*: @Configurable は、Mule 3.7 では非推奨になっています。
+
+最後に、単体テストを追加し、さまざまな入力およびエラー状況に基づいて操作の動作を検証する必要があります。
+
+[NOTE]
+====
+*テスト駆動型アプローチの適用*
+
+MuleSoft 環境では、コネクタの操作を構築するときのテスト駆動型開発に似たサイクルに従うコネクタ実装プロジェクトが最も成功しています。
+
+* 操作の詳細な要件 (入力として受け入れたり、応答として返したりできるエンティティ (POJO または特定のコンテンツとのマップ)、エッジケース (無効な値や間違った型の値など)、操作で発生する可能性のある例外) を決定する
+* それらの要件をカバーする JUnit テストを実装する
+* それらのテストに合格するための十分な操作を実装する (新しいエンティティクラスや例外の作成を含む)
+* 操作に関連する Javadoc を入力するコメントを使用して、`@Connector` クラスや他のコードを更新する
+
+指定された操作の要件のすべてのシナリオをカバーするまで繰り返します。次に、コネクタの機能が完成するまで同じサイクルを使用して各操作を実装します。
+
+クライアントライブラリが適切に文書化されていると、操作の想定される動作が明確になり、対処するエッジケースや特定の例外的な状況の単体テストを削減できます。ただし、コネクタの信頼性は、ベースとなる Java クライアントによって決まることに留意してください。
+
+「いつ Studio でコネクタを試すのか?」と疑問に思うかもしれません。自動化された JUnit テストに加えて、進捗に従って手動で各操作をテストすることは効果的で好ましいことです。各操作をテストすると、以下を実現できます。
+
+* 作業時の基本的な操作機能の実際の動作を確認し、進行の感覚を掴める。
+* Studio UI でコネクタがどのように表示されるのかを確認できる (自動化された単体テストでは表示できないことがある)。たとえば、Javadoc コメントのテキストは、コネクタのダイアログボックスの項目のツールチップを入力するために使用されます。
+
+手動でテストすることで、コネクタの外観を仕上げたり、妥当なデフォルトで環境を改善したりする機会を得られます。
+
+ただし、これによってテスト駆動型アプローチの価値が損なわれることはありません。多くのコネクタ開発プロジェクトでは、操作を定義するときにテストを定義する (事前作業は増える (ように見える) が、それだけの価値があり、より良い結果を迅速に得られる) ことができずに、行き詰まったり、使いにくいコネクタが生成されたりしてきました。
+====
+
+=== 操作のプロキシクラスメソッドの追加
+
+最終的なコネクタで公開する操作ごとに、スタブクライアントの対応するメソッドをコールするプロキシクラスにメソッドを追加します。スタブクライアントは、WSDL に記述されているすべてのメソッドを公開します。コネクタのサービスのすべての操作を公開しない場合、不要な操作をプロキシクライアントと `@Connector` クラスから除外します。
+
+たとえば、パラメータと戻り値として `org.tutorial.sunsetrise.definition.LatLonDate` のインスタンスを使用する `getSunSetRiseTime()` 操作を公開するようにクラス `SunSetRiseProxyClient` を更新します。`LatLonDate` をプロキシクラス定義にインポートします。
+
+[source,java,linenums]
+----
+// Add to imports
+import org.tutorial.sunsetrise.definition.LatLonDate;
+
+....
+
+// Add proxy class method for getSunSetRiseTime() operation
+
+    public LatLonDate getSunSetRiseTime(LatLonDate in) {
+    // One could do some pre-call validation here on the input parameter etc.
+        return port.getSunSetRiseTime(in);
+    }
+----
+
+`SunSetRiseProxyClient` の完全なコードを以下に示します。
+
+*ソースの表示*
+
+[source,java,linenums]
+----
+package org.tutorial.sunsetrise.client;
+import java.net.MalformedURLException;
+import java.net.URL;
+import org.mule.api.ConnectionException;
+import org.mule.api.ConnectionExceptionCode;
+import org.tutorial.sunsetrise.definition.SunSetRiseService;
+import org.tutorial.sunsetrise.definition.SunSetRiseServiceSoap;
+import org.tutorial.sunsetrise.definition.LatLonDate;
+public class SunSetRiseProxyClient {
+
+        private SunSetRiseServiceSoap port;
+
+        public SunSetRiseProxyClient() {}
+
+        public void initialize(String wsdlLocation) throws ConnectionException {
+            SunSetRiseService svc;
+
+            try {
+                svc = new SunSetRiseService(new URL(wsdlLocation));
+            } catch (MalformedURLException e) {
+                // This is an Exception used by Mule at Connection Time
+                throw new ConnectionException(ConnectionExceptionCode.UNKNOWN,
+                     "", "The URL of the WSDL location is malformed");
+            }
+
+            port = svc.getSunSetRiseServiceSoap();
+
+            // In here, configure Authentication headers if the service uses them.
+
+        }
+        public LatLonDate getSunSetRiseTime(LatLonDate in) {
+            return port.getSunSetRiseTime(in);
+        }
+
+}
+----
+
+=== `@Connector` クラスへの `@Processor` メソッドの追加
+
+`@Connector` クラスで、次の作業を行う必要があります。
+
+* 操作に必要なエンティティクラスをインポートする
+* プロキシクライアントクラスの操作のメソッドをコールする操作の `@Processor` メソッドを追加する
+
+この例では、`LatLonDate` クラスをインポートします。
+
+[source,java,linenums]
+----
+import org.tutorial.sunsetrise.definition.LatLonDate;
+----
+
+次に、以下のように `getSunSetRiseTime()` メソッドを追加します。
+
+[source,java,linenums]
+----
+/**
+     * Custom processor
+     *
+     * {@sample.xml ../../../doc/sunsetrise-connector.xml.sample sunsetrise-connector:get-sunset-rise-time}
+     *
+     * @param in A LatLonDate object, with latitude, longitude, month,
+     * date, and year initialized. Defaults to the payload.
+     * @return Latitude, Longitude, Date, Sunrise and Sunset times,
+     * and a Timezone value in a LatLonDate
+     */
+    @Processor
+    public LatLonDate getSunSetRiseTime(
+        @Default("#[payload]")
+        LatLonDate in) {
+        return connectionStrategy.getClient().getSunSetRiseTime(in);
+    }
+----
+
+*注意*: `@Optional` および `@Default` アノテーションを使用して、引数が指定されなかった場合に、操作で引数としてペイロードを取得する必要があることを指定します。
+
+`@Processor` メソッドのパラメータは、コネクタのプロパティダイアログで操作パラメータとして自動的に公開されます。ツールチップは、対応する `@param` コメントによって決まります。
+
+=== Javadoc の XML 設定例の追加
+
+DevKit では、メソッドの JavaDoc ドキュメントが強制されます。各コネクタメソッドで必要な入力の XML サンプルなどを追加する必要があります。&#8203;http://mulesoft.github.io/mule-devkit/[DevKit の Javadoc アノテーションについての詳細を確認]してください。
+
+`@Connector` クラスのソースコードの次のコメントテキストにより、メソッドがその必要な XML サンプルにリンクされます。パスは、ファイルシステムではなく Studio プロジェクトの *doc* フォルダになります。
+
+[source,java,linenums]
+----
+* {@sample.xml ../../../doc/sunsetrise-connector.xml.sample sunsetrise:get-sunset-rise-time}
+----
+
+サンプルコードスニペットファイルは、DevKit によって生成されたプロジェクトの *doc* フォルダにあります。
+
+このファイルは DevKit によって作成されますが、各操作のサンプル Mule XML 設定を入力する必要があります。この例では、以下をファイルに追加して `getSunSetRiseTime()` 操作を文書化します。
+
+[source,xml,linenums]
+----
+<!-- BEGIN_INCLUDE(sunsetrise-connector:get-sun-set-rise-time) -->
+<sunsetrise:get-sun-set-rise-time latitude="40.4" longitude="32.25" month="7" day="12" year="2015" />
+<!-- END_INCLUDE(sunsetrise-connector:get-sun-set-rise-time) -->
+----
+
+JavaDoc を構築するときに、上記のサンプルがドキュメントに挿入されます。
+
+コネクタの JavaDoc の入力についての詳細は、xref:connector-reference-documentation.adoc[「DevKit コネクタドキュメントの作成」]を参照してください。
+
+== すべての統合
+
+少なくとも次のタスクが完了していれば、コネクタを構築してテストできます。
+
+* 「SOAP コネクタの作成」の説明に従って WSDL からコネクタを作成する。
+* wsdl2java および Maven を使用してスタブクライアントを作成する
+* 初期化メソッドと 1 つ以上の操作が含まれるプロキシクライアントクラスを作成する
+* 操作をコールする `@Connector` クラスの `@Processor` メソッドを追加する
+* 必要なドキュメントと単体テストを提供する
+
+コネクタを構築して Studio にインストールするために実行する手順については、xref:installing-and-testing-your-connector-in-studio.adoc[「コネクタのインストールとテスト」]を参照してください。
+
+このプロセスが完了したら、SunSetRise コネクタがパレットに追加されます。
+
+以下のように、コネクタのデモを行う簡単なフローを構築できます。
+
+[.ex]
+=====
+[discrete.view]
+=== Studio Visual Editor
+
+image::sunsetriseflow.png[SunsetRiseFlow]
+
+image::studio-config.png[]
+
+[discrete.view]
+=== XML エディタ
+
+[source,xml,linenums]
+----
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:sunsetrise="http://www.mulesoft.org/schema/mule/sunsetrise" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:spring="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sunsetrise http://www.mulesoft.org/schema/mule/sunsetrise/current/mule-sunsetrise.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <sunsetrise:config-type name="SunsetriseConfig" username="foo" doc:name="Sunsetrise: Connection Management type strategy"/>
+    <flow name="mule-sunsetFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/" doc:name="HTTP"/>
+        <sunsetrise:get-sun-set-rise-time config-ref="SunsetriseConfig" doc:name="Sunsetrise">
+            <sunsetrise:in latitude="15" sunRiseTime="0.0" day="12" longitude="0" month="12" sunSetTime="0.0" timeZone="0" year="2015"/>
+        </sunsetrise:get-sun-set-rise-time>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+    </flow>
+</mule>
+----
+
+=====
+
+== 次のステップ
+
+上記のプロセスが完了すると、SOAP CXF コネクタが機能するようになります。次の作業を行うことができます。
+
+* 同じプロセスを使用して操作を追加する
+* サンプルファイルは、このドキュメントの WSDL2Java セクション用の link:{attachmentsdir}/CxfExampleFiles.zip[CxfExampleFiies.zip] 添付ファイルにあります。
+
+== 付録 - sunsetriseservice WSDL
+
+[source,xml,linenums]
+----
+<?xml version="1.0" encoding="utf-8"?>
+<wsdl:definitions xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:tns="http://www.webserviceX.NET/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:s="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" targetNamespace="http://www.webserviceX.NET/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:types>
+    <s:schema elementFormDefault="qualified" targetNamespace="http://www.webserviceX.NET/">
+      <s:element name="GetSunSetRiseTime">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="L" type="tns:LatLonDate" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="LatLonDate">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="Latitude" type="s:float" />
+          <s:element minOccurs="1" maxOccurs="1" name="Longitude" type="s:float" />
+          <s:element minOccurs="1" maxOccurs="1" name="SunSetTime" type="s:float" />
+          <s:element minOccurs="1" maxOccurs="1" name="SunRiseTime" type="s:float" />
+          <s:element minOccurs="1" maxOccurs="1" name="TimeZone" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="Day" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="Month" type="s:int" />
+          <s:element minOccurs="1" maxOccurs="1" name="Year" type="s:int" />
+        </s:sequence>
+      </s:complexType>
+      <s:element name="GetSunSetRiseTimeResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="GetSunSetRiseTimeResult" type="tns:LatLonDate" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+    </s:schema>
+  </wsdl:types>
+  <wsdl:message name="GetSunSetRiseTimeSoapIn">
+    <wsdl:part name="parameters" element="tns:GetSunSetRiseTime" />
+  </wsdl:message>
+  <wsdl:message name="GetSunSetRiseTimeSoapOut">
+    <wsdl:part name="parameters" element="tns:GetSunSetRiseTimeResponse" />
+  </wsdl:message>
+  <wsdl:portType name="SunSetRiseServiceSoap">
+    <wsdl:operation name="GetSunSetRiseTime">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Get Sunset and Sunrise time for any location in the world&lt;br&gt;&lt;b&gt;Longitude:&lt;/b&gt;Positive in Western Hemisphere,Negative in Eastern Hemisphere&lt;br&gt;&lt;b&gt;Latitude:&lt;/b&gt;Positive in Northern Hemisphere,Negative in Southern Hemisphere</wsdl:documentation>
+      <wsdl:input message="tns:GetSunSetRiseTimeSoapIn" />
+      <wsdl:output message="tns:GetSunSetRiseTimeSoapOut" />
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:portType name="SunSetRiseServiceHttpGet" />
+  <wsdl:portType name="SunSetRiseServiceHttpPost" />
+  <wsdl:binding name="SunSetRiseServiceSoap" type="tns:SunSetRiseServiceSoap">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="GetSunSetRiseTime">
+      <soap:operation soapAction="http://www.webserviceX.NET/GetSunSetRiseTime" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="SunSetRiseServiceSoap12" type="tns:SunSetRiseServiceSoap">
+    <soap12:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="GetSunSetRiseTime">
+      <soap12:operation soapAction="http://www.webserviceX.NET/GetSunSetRiseTime" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="SunSetRiseServiceHttpGet" type="tns:SunSetRiseServiceHttpGet">
+    <http:binding verb="GET" />
+  </wsdl:binding>
+  <wsdl:binding name="SunSetRiseServiceHttpPost" type="tns:SunSetRiseServiceHttpPost">
+    <http:binding verb="POST" />
+  </wsdl:binding>
+  <wsdl:service name="SunSetRiseService">
+    <wsdl:port name="SunSetRiseServiceSoap" binding="tns:SunSetRiseServiceSoap">
+      <soap:address location="http://www.webservicex.net/sunsetriseservice.asmx" />
+    </wsdl:port>
+    <wsdl:port name="SunSetRiseServiceSoap12" binding="tns:SunSetRiseServiceSoap12">
+      <soap12:address location="http://www.webservicex.net/sunsetriseservice.asmx" />
+    </wsdl:port>
+    <wsdl:port name="SunSetRiseServiceHttpGet" binding="tns:SunSetRiseServiceHttpGet">
+      <http:address location="http://www.webservicex.net/sunsetriseservice.asmx" />
+    </wsdl:port>
+    <wsdl:port name="SunSetRiseServiceHttpPost" binding="tns:SunSetRiseServiceHttpPost">
+      <http:address location="http://www.webservicex.net/sunsetriseservice.asmx" />
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>
+----

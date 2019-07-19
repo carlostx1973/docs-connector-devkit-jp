@@ -1,0 +1,162 @@
+= Java SDK ベースのコネクタの作成
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, java, sdk, コネクタ
+
+Studio 用の独自の Anypoint コネクタを構築するには、Anypoint コネクタ DevKit を使用します。Anypoint Studio で、xref:index.adoc[Anypoint コネクタ DevKit] を使用できるようにする拡張モジュールを追加できます。
+
+== 新しい Java SDK ベースのコネクタプロジェクトを作成する
+
+*注意*: 既存のコネクタプロジェクトをインポートするには、xref:creating-a-java-sdk-based-connector.adoc[「既存のコネクタプロジェクトのインポート」]を参照してください。
+
+. *[File (ファイル)] > [New (新規)]* をクリックし、*[Anypoint Connector Project (Anypoint コネクタプロジェクト)]* を選択します。
++
+image::new-proj2.png[new+proj2]
++
+Anypoint コネクタプロジェクトを作成します。
++
+[%header%autowidth.spread]
+|===
+|項目 |エントリ
+|*Connector Name (コネクタ名)* |Anypoint コネクタプロジェクトの一意の名前を定義します。
+|*Project Name (プロジェクト名)* |コネクタプロジェクト名。
+|*名前空間* |コネクタプロジェクトの名前空間。
+|*場所* |コネクタプロジェクトの場所。
+2.+|*API:*
+|*型* a|*[Type (種別)]* 項目を使用して、コネクタがリソースにアクセスできる方法を選択します。
+
+* *Java SDK*。xref:creating-a-connector-using-a-java-sdk.adoc[「Java SDK を使用したコネクタの作成」]を参照してください。
++
+image::generictype.png[GenericType]
+
+* *SOAP*。xref:creating-a-soap-connector.adoc[「SOAP コネクタの作成」]を参照してください。
+|*認証* |コネクタがそのリソースにアクセスする方法に関する認証の選択肢 (xref:connection-management.adoc[[Connection Management (接続管理)]]、xref:oauth-v1.adoc[[OAuth V1]]、xref:oauth-v2.adoc[[OAuth V2]]) をクリックします。
+2.+|*DataSense:*
+|*Add DataSense methods (DataSense メソッドを追加)* |リソースのエンティティのメタデータを表示するメソッドを提供します。詳細は、xref:adding-datasense.adoc[「DataSense の追加」]を参照してください。
+|*Add DataSense Query Method (DataSense クエリメソッドを追加)*
+|DataSense クエリ言語のメソッドを追加します。詳細は、xref:adding-datasense-query-language.adoc[「DataSense クエリ言語の追加」]を参照してください。
+|===
+
+. **[Next (次へ)]** をクリックし、以下の表に応じて、ウィザードの最後の画面の項目に値を入力します。変更することなくデフォルト値を適用できる場合もあります。
++
+[%header%autowidth.spread]
+|===
+|項目 |説明
+|*Maven Settings (Maven 設定)* |必要に応じて *[Manually set values (手動で値を設定)]* をクリックし、Maven グループ ID、アーティファクト ID、またはコネクタのバージョンを変更します。
+|*GitHub Settings (GitHub 設定)* |必要に応じて *[Add GitHub information (GitHub 情報を追加)]* をクリックし、プロジェクトを新規または既存の GitHub リポジトリにリンクします。
+|===
+. *[Next (次へ)]* をクリックし、ユーザがコネクタを使用してプロジェクトを構築するときに Anypoint Studio にコネクタのアイコンがどのように表示されるのかを選択します。
++
+image::creating-a-java-sdk-based-connector-71fef.png[アイコンセット]
+. *[Finish (完了)]* をクリックします。これにより、必要なすべての要素 (コネクタの画像、サンプルドキュメント、基本的なテストなど) が含まれる構造を備えたプロジェクトが生成されます。xref:installing-and-testing-your-connector-in-studio.adoc[「Studio でのコネクタのインストールとテスト」]のこの最初の基本構造に基づいて構築するには、DevKit ドキュメントを参照してください。
++
+image::screen05.png[]
+
+
+== その他の DevKit アクション
+
+プラグインでは、ツールバーのアクションも提供されます。
+
+image::actions.jpg[]
+
+Package Explorer でプロジェクトを右クリックして、同じアクションにアクセスすることもできます。
+
+image::screen21.png[]
+
+DevKit プロジェクトのルートを選択したときに有効になるアクション:
+
+[cols="2*"]
+|===
+|*Generate Tests (テストを生成)* |コネクタプロセッサの機能テストケースを生成します。
+|*Install Or Update (インストールまたは更新)* |Anypoint Studio やローカルリポジトリでコネクタをインストールまたは更新します。
+|*Preview Documentation (ドキュメントをプレビュー)* |サンプルドキュメントファイルに含まれているサンプルを利用して、コネクタの Javadoc を生成します。
+|*Generate Sources (ソースを生成)* |ソース、スキーマ、エディタ、および Mule や Anypoint Studio と統合するために必要なすべてを生成します。これは、Mule アプリケーションのコネクタの動作をデバッグする場合に役立ちます。
+|*Enable Javadoc check (Javadoc チェックを有効化)*/*Disable Javadoc check (Javadoc チェックを無効化)* |コネクタをリリースする前に、Javadoc に問題がないことを確認します。このフラグが有効になっていると、構築しようとしたときに、Javadoc コメントまたはサンプルが欠落しているすべてのプロセッサが表示されます。
+|===
+
+=== コネクタの使用
+
+プロジェクトを右クリックし、*[Anypoint Connector (Anypoint コネクタ)]* > *[Install or Update (インストールまたは更新)]* を選択して、Anypoint Studio にコネクタをコピーできます。パレットで簡単に見つけるには、検索ボックスに名前を入力します。
+
+image::screen18.png[]
+
+=== ドキュメントのプレビュー
+
+コネクタを構築すると、コード内に追加した Javadoc アノテーションのわかりやすい参照として機能する HTML ファイルが DevKit によって自動的に作成されます。このファイルの内容は、プロジェクト全体を構築しなくてもプレビューできます。これは、ターミナルのプロジェクトフォルダで次のコマンドを実行することに相当します。
+
+[source,text,linenums]
+----
+mvn clean package -DskipTests javadoc:javadoc
+----
+
+=== ソースの生成
+
+コネクタを構築して、プロジェクトの */target* フォルダに .zip ファイルと .jar ファイルの両方を生成するように DevKit に指示できます。これらのファイルを使用してテストします。つまり、Studio の自分のインスタンスや Studio の他の個別のインスタンスでコネクタを使用します。ソースを生成するには、Package Explorer でプロジェクトを右クリックし、[Anypoint Connector (Anypoint コネクタ)] > [Generate Sources (ソースを生成)] を選択します。  これは、コマンドコンソールのプロジェクトフォルダ内から次のコマンドを実行することに相当します。
+
+[source,text,linenums]
+----
+mvn clean package -DskipTests -Ddevkit.studio.package.skip=true -Ddevkit.javadoc.check.skip=true -Dmaven.javadoc.skip=true
+----
+
+=== Javadoc チェックの無効化
+
+DevKit では、コネクタのコール可能なすべてのメソッドの Javadoc ドキュメントを提供する必要があります。ただし、作業中のプロジェクトをテストするために、Javadoc チェックを無効にして、プロジェクトが完成してテストの準備が整うまでドキュメントを延期できます。
+
+[source,text,linenums]
+----
+mvn clean package -Ddevkit.javadoc.check.skip=true
+----
+
+== サンプルの追加
+
+サンプルに移動するには、​*command キー*​を押したままサンプルリンクをクリックします。サンプルが存在する場合、サンプルエディタでプロセッサのサンプルが開きます。
+
+Javadoc チェックを有効にしている場合、`control + space` と入力してトリガできるクイックフィックスを使用すると、欠落しているサンプルを追加するのに役立ちます。
+
+image::screen24.png[]
+
+サンプル (XML ファイル) がどのように表示されるのかを次に示します。その中には、使用可能ないくつかの単純なテンプレートがあります。
+
+image::screen25.png[]
+
+== 生成されたコネクタの理解
+
+基本的にコネクタは、コネクタの開発目的の API をコンシュームするためにユーザが入力する一連の操作と設定可能な要素で構成されています。
+
+=== 設定可能な項目
+
+コネクタの設定可能な項目は、DevKit ビューでは次のように表示されます。
+
+image::screen11_1.png[]
+
+ユーザは、コネクタの設定グローバル要素を追加するときに Studio でその項目を設定できます。
+
+コネクタを右クリックして *[Anypoint Connector (Anypoint コネクタ)]* > *[Install or Update (インストールまたは更新)]* をクリックし、指示に従って Studio を再起動することでコネクタをインストールしたら、ユーザは Mule プロジェクトを作成してコネクタを使用できます。後続のステップは、コネクタの [Configurable (設定可能)] セクションでユーザがどのようにコネクタを設定できるのかを示しています。
+
+設定方法:
+
+. コネクタのインスタンスをキャンバスにドラッグします。
+. コネクタをダブルクリックして、そのプロパティエディタを開きます。
+. *[Connector Configuration (コネクタ設定)]* 項目の横にある緑のプラス記号をクリックします。 +
++
+image::add-global-element.jpg[add+global+element]
++
+. 項目の値を設定します。コネクタで設定するデフォルト値は、コネクタの設定項目 *[My Property (私のプロパティ)]* に初期値として表示されます。
++
+image::devkitproperty.png[DevKitProperty]
+
+== プロセッサ
+
+ユーザがコネクタから作成された Mule プロジェクトを設定する場合、[Operation (操作)] 項目のオプションは、コネクタの @Processor コードに対応します。図の上部のビューでは、Demo コネクタの [Operation (操作)] として [My Processor (私のプロセッサ)] が設定されています。図の下部には、コネクタのプロセッサの値が表示されています。
+
+image::myprocessor.png[MyProcessor]
+
+この例では、1 つの文字列がこのプロセッサのメソッドの入力として設定されています。操作が選択されると入力項目として「文字列」が表示されます。
+
+image::content.png[Content (コンテンツ)]
+
+== 関連情報
+
+* *次へ:* API のxref:authentication.adoc[認証方法の選択と実装]に進みます。
+* xref:connector-project-structure.adoc[コネクタプロジェクト構造]についての詳細を学習します。

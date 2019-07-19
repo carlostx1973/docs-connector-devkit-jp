@@ -1,0 +1,335 @@
+= Java SDK ベースのコネクタの例
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, java, sdk, エンティティクラス, データモデル, コネクタ
+
+この例では、Java SDK を介して公開される API の Anypoint コネクタの実装について説明します。このドキュメントのプロセスに従って、サービスの Java SDK ベースのコネクタを構築します。
+
+多くの場合、リモートサービスと統合するための最適なオプションは Java クライアントライブラリになります。クライアントライブラリがアプリケーションプロバイダで正式にサポートされている場合、または非公式でも広く使用されている場合、一般的なユースケースでアプリケーションと統合するベストプラクティスを実装できる可能性が高くなります。
+
+== 前提条件
+
+このドキュメントは、読者がxref:index.adoc[「Anypoint コネクタ DevKit」]で説明されている Anypoint コネクタのアーキテクチャに精通していることを前提としています。また、読者がxref:creating-an-anypoint-connector-project.adoc[「Anypoint コネクタプロジェクトの作成」]の手順に従って新しいコネクタプロジェクトを作成していることも前提としています。
+
+== SDK ベースのコネクタのアーキテクチャ
+
+SDK ベースのコネクタの全体的なアーキテクチャは次のようになります。
+
+image::java-client-architecture2.png[java_client_architecture2]
+
+コネクタには、以下のコンポーネントがあります。
+
+*  *SDK* - 認証方法とサポートされている操作を公開する Java SDK。「<<Adding an SDK to a Connector Project>>」セクションを参照してください。
+*  *エンティティクラス* - 通常、Java SDK で定義されているサポート対象データモデルエンティティクラス。
+*  *@Connector* - DevKit で生成されるスケルトンに基づいて実装する `@Connector` クラス +
+
+Java SDK は、一般的に RESTful または SOAP ベースの Web サービスと通信しますが、実際には必要なすべてのクライアントロジック (Java)、およびコネクタのクライアントレイヤを構築する追加の作業や複雑さをカプセル化します。また、SDK は、管理しやすい Java ファサードの背後にある不適切な設計の Web サービスの標準以外の動作を隠すこともできます。
+
+=== サンプルコネクタ
+
+この説明のサンプルは、非公式だが広く使用されている http://twitter4j.org/[twitter4j] クライアントライブラリに基づく MuleSoft Twitter コネクタです。&#8203;https://github.com/mulesoft/twitter-connector/[GitHub の Twitter コネクタのソースコード]は、説明セクションで使用および参照されます。
+
+[NOTE]
+====
+Twitter コネクタは、DevKit 機能の多くの側面を示します。この説明の焦点は、SDK と `@Connector` クラス間のリレーションです。
+
+認証について、Twitter コネクタは、&#8203;https://github.com/mulesoft/twitter-connector/blob/develop/src/main/java/org/mule/modules/twitter/TwitterConnector.java[`TwitterConnector.java`] で定義されている興味深いハイブリッドアプローチを実装します。
+
+* Twitter4J クライアントライブラリは、Mule コネクタが利用するその独自の OAuth サポートを実装します。
+* コネクタは、DevKit の OAuth サポートを使用しないため、DevKit のxref:authentication.adoc[接続戦略]を使用できます。
+====
+
+== コネクタプロジェクトへの SDK の追加
+
+SDK の配信方法によっては、SDK をプロジェクトの Maven POM ファイルに追加できます。
+
+たとえば、次のように Maven 中央リポジトリから Twitter4J を Maven 連動関係として追加できます。
+
+[source,xml,linenums]
+----
+<dependency>
+    <groupId>org.twitter4j</groupId>
+    <artifactId>twitter4j-core</artifactId>
+    <version>3.0.3</version>
+</dependency>
+----
+
+=== @Connector クラスの定義
+
+まず、次のセクションで示されているように、接続管理と認証に関する `@Connector` クラスの基本機能を構築します。
+
+==== エンティティクラスと例外の定義
+
+通常、コネクタの例外は 2 つ以上定義することをお勧めします。1 つは接続と認証に関連する失敗を示し、もう 1 つは、その他のすべての失敗 (操作で使用される無効な引数の例外など) を示します。個別の例外パッケージは、これらの例外を定義するのに適した場所です。
+
+=== 認証および接続管理の実装
+
+認証は、`@Connector` クラスと SDK の両方に実装されます。`@Connector` クラスの認証の実装の詳細は、選択した認証スキームと SDK 認証サポートによって異なります。
+
+xref:defining-connector-attributes.adoc[「コネクタ属性の定義」]の説明に従って `@Connector` クラスの `@Configurable` プロパティを追加したり、xref:connector-connection-strategies.adoc[「コネクタ設定戦略」]の説明に従って接続戦略を利用したりします。
+
+たとえば、コネクタの接続ライフサイクルを SDK の接続メカニズムにバインドする必要があります。
+
+=== Twitter4J OAuth サポートの利用
+
+ネイティブにサポートされている接続メカニズムを使用する場合、DevKit サポートを利用する必要があります。そうでない場合、Twitter と同様にハイブリッドアプローチを使用できます。Twitter コネクタは、GitHub の https://github.com/mulesoft/twitter-connector/blob/develop/src/main/java/org/mule/modules/twitter/TwitterConnector.java[TwitterConnector.java] で定義されている興味深いハイブリッドアプローチを実装します。
+
+* Twitter4J クライアントライブラリは、Mule コネクタが利用するその独自の OAuth サポートを実装します。
+* コネクタは、DevKit の OAuth サポートを使用しないため、DevKit の接続管理フレームワークを使用できます。
+
+そのため、`@OAuth` アノテーションのないクラス定義があります。
+
+[source,java,linenums]
+----
+@Connector(name = "twitter", schemaVersion = "3.1", description = "Twitter Integration",
+  friendlyName = "Twitter", minMuleVersion = "3.6", connectivityTesting = ConnectivityTesting.DISABLED)
+public class TwitterConnector implements MuleContextAware {
+  ...
+----
+
+また、`@ConnectionKey` が OAuth `accessKey` に設定された `@Connect` メソッド、および関連付けられている通常の `@Disconnect`、`@ValidateConnection`、`@ConnectionIdentifier` メソッドもあります。
+
+[source,java,linenums]
+----
+@Connect
+public void connect(@ConnectionKey String accessKey, String accessSecret) throws ConnectionException{
+      ConfigurationBuilder cb = new ConfigurationBuilder();
+      cb.setUseSSL(useSSL);
+      cb.setHttpProxyHost(proxyHost);
+      cb.setHttpProxyPort(proxyPort);
+      cb.setHttpProxyUser(proxyUsername);
+      cb.setHttpProxyPassword(proxyPassword);
+
+      HttpClientHiddenConstructionArgument.setUseMule(true);
+      twitter = new TwitterFactory(cb.build()).getInstance();
+
+      twitter.setOAuthConsumer(consumerKey, consumerSecret);
+      if (accessKey != null) {
+          twitter.setOAuthAccessToken(new AccessToken(accessKey, accessSecret));
+          setAccessToken(accessKey);
+          setAccessTokenSecret(accessSecret);
+      }
+  }
+  ...
+
+  @Disconnect
+  public void disconnect() {
+      twitter = null;
+  }
+
+  @ValidateConnection
+  public boolean validateConnection() {
+      return twitter != null;
+  }
+
+  @ConnectionIdentifier
+  public String getConnectionIdentifier() {
+      return getAccessToken() + "-" + getAccessTokenSecret();
+  }
+----
+
+一方、クラス `twitter4j.Twitter` で公開される機能をコールしてアクセストークンの取得や管理などを行う OAuth 関連の機能を実装する一連の `@Processor` メソッドもあります。
+
+[source,java,linenums]
+----
+/**
+ * Set the OAuth verifier after it has been retrieved via requestAuthorization.
+ * The resulting access tokens log to the INFO level so the user can
+ * reuse them as part of the configuration in the future if desired.
+ * <p/>
+ * {@sample.xml ../../../doc/twitter-connector.xml.sample twitter:setOauthVerifier}
+ *
+ *
+ * @param requestToken request token from Twitter
+ * @param oauthVerifier The OAuth verifier code from Twitter.
+ * @return Twitter AccessToken info.
+ * @throws TwitterException when Twitter service or network is unavailable
+ */
+@Processor
+public AccessToken setOauthVerifier(@Optional RequestToken requestToken, String oauthVerifier) throws TwitterException {
+    AccessToken accessToken;
+    if (requestToken != null) {
+        accessToken = twitter.getOAuthAccessToken(requestToken, oauthVerifier);
+    }
+    else {
+        accessToken = twitter.getOAuthAccessToken(oauthVerifier);
+    }
+
+    logger.info("Got OAuth access tokens. Access token:" + accessToken.getToken()
+            + " Access token secret:" + accessToken.getTokenSecret());
+
+    return accessToken;
+}
+
+/**
+ * Start the OAuth request authorization process.
+ */
+
+@Processor
+  public RequestToken requestAuthorization(@Optional String callbackUrl) throws TwitterException {
+      RequestToken token = twitter.getOAuthRequestToken(callbackUrl);
+      return token;
+  }
+
+  ...
+ public String getAccessToken() {
+      return accessToken;
+  }
+  public void setAccessToken(String accessToken) {
+      this.accessToken = accessToken;
+  }
+
+  public String getAccessTokenSecret() {
+      return accessTokenSecret;
+  }
+
+  public void setAccessTokenSecret(String accessTokenSecret) {
+      this.accessTokenSecret = accessTokenSecret;
+  }
+----
+
+実際に Twitter 操作をコールする @Processor メソッドは、@OAuthProtected アノテーションを使用しません。
+
+[source,java,linenums]
+----
+@Processor
+  public User showUser() throws TwitterException {
+      return twitter.showUser(twitter.getId());
+  }
+----
+
+独自の OAuth サポートを提供するクライアントライブラリを使用する場合、このコードを掘り下げて、同じような実装パターンを使用することもできます。
+
+== @Connector クラスへの操作の追加
+
+この時点で、コネクタへの操作の追加を開始できます。
+
+SDK では、次のような手順を実行して操作を追加します。
+
+* 操作でパラメータまたは戻り値として使用される Java エンティティ SDK クラスやクライアントライブラリで発生する可能性のある例外をインポートする
+* クライアントインスタンスの操作をコールする `@Connector` クラスの `@Processor` メソッドを追加する
+
+特定のクライアントクラスに応じて、認証を処理するために操作メソッドに認証機能を追加することが必要になる場合もあります。
+
+[NOTE]
+====
+*テスト駆動型アプローチの適用*
+
+MuleSoft 環境では、コネクタの操作を構築するときのテスト駆動型開発に似たサイクルに従うコネクタ実装プロジェクトが最も成功しています。
+
+* 操作の詳細な要件 (入力として受け入れたり、応答として返したりできるエンティティ (POJO または特定のコンテンツとのマップ)、エッジケース (無効な値や間違った型の値など)、操作で発生する可能性のある例外) を決定する
+* それらの要件をカバーする JUnit テストを実装する
+* それらのテストに合格するための十分な操作を実装する (新しいエンティティクラスや例外の作成を含む)
+* 操作に関連する Javadoc を入力するコメントを使用して、`@Connector` クラスや他のコードを更新する
+
+指定された操作の要件のすべてのシナリオをカバーするまで繰り返します。次に、コネクタの機能が完成するまで同じサイクルを使用して各操作を実装します。
+
+SDK が適切に文書化されていると、操作の想定される動作が明確になり、対処するエッジケースや特定の例外的な状況の単体テストを削減できます。ただし、コネクタの信頼性は、ベースとなる SDK によって決まることに留意してください。
+
+「いつ Studio でコネクタを試すのか?」と疑問に思うかもしれません。自動化された JUnit テストに加えて、進捗に従って手動で各操作をテストすることは効果的で好ましいことです。各操作をテストすると、以下を実現できます。
+
+* 作業時の基本的な操作機能の実際の動作を確認し、進行の感覚を掴める。
+* Studio UI でコネクタがどのように表示されるのかを確認できる (自動化された単体テストでは表示できないことがある)。たとえば、Javadoc コメントのテキストは、コネクタのダイアログボックスの項目のツールチップを入力するために使用されます。
+
+手動でテストすることで、コネクタの外観を仕上げたり、妥当なデフォルトで環境を改善したりする機会を得られます。
+
+ただし、これによってテスト駆動型アプローチの価値が損なわれることはありません。多くのコネクタ開発プロジェクトでは、操作を定義するときにテストを定義する (事前作業は増える (ように見える) が、それだけの価値があり、より良い結果を迅速に得られる) ことができずに、行き詰まったり、使いにくいコネクタが生成されたりしてきました。
+====
+
+=== 操作の実装
+
+Twitter コネクタは豊富な操作を実装します。次に、比較的単純な操作をいくつか示します。
+
+[source,java,linenums]
+----
+/**
+ * Returns a single status, specified by the id parameter below. The status's
+ * author returns inline. <br>
+ * This method calls http://api.twitter.com/1.1/statuses/show
+ * <p/>
+ * {@sample.xml ../../../doc/twitter-connector.xml.sample twitter:showStatus}
+ *
+ * @param id the numerical ID of the status you're trying to retrieve
+ * @return a single {@link Status}
+ * @throws twitter4j.TwitterException when Twitter service or network is unavailable
+ * @see <a href="http://dev.twitter.com/doc/get/statuses/show/:id">GET
+ *      statuses/show/:id | dev.twitter.com</a>
+ */
+@Processor
+public Status showStatus(long id) throws TwitterException {
+    return twitter.showStatus(id);
+}
+
+/**
+ * Answers user information for the authenticated user
+ * <p/>
+ * {@sample.xml ../../../doc/twitter-connector.xml.sample twitter:showUser}
+ *
+ * @return a {@link User} object
+ * @throws TwitterException when Twitter service or network is unavailable
+ */
+@Processor
+public User showUser() throws TwitterException {
+    return twitter.showUser(twitter.getId());
+}
+
+/**
+ * Search for places that can be attached to a statuses/update. Given a latitude
+ * and a longitude pair, or an IP address, this request returns a list of
+ * all valid places that can be used as the place_id when updating a status.
+ * <p/>
+ * {@sample.xml ../../../doc/twitter-connector.xml.sample twitter:searchPlaces}
+ *
+ * @param latitude  latitude coordinate. Mandatory if no IP address is specified.
+ * @param longitude longitude coordinate.
+ * @param ip        the IP. Mandatory if no coordinates are specified.
+ * @return a {@link ResponseList} of {@link Place}
+ * @throws TwitterException when Twitter service or network is unavailable
+ */
+@Processor
+public ResponseList<Place>
+  searchPlaces(@Placement(group = "Coordinates") @Optional Double latitude,
+               @Placement(group = "Coordinates") @Optional Double longitude,
+               @Optional String ip) throws TwitterException {
+    return twitter.searchPlaces(createQuery(latitude, longitude, ip));
+}
+
+private GeoQuery createQuery(Double latitude, Double longitude, String ip) {
+    if (ip == null) {
+        return new GeoQuery(new GeoLocation(latitude, longitude));
+    }
+    return new GeoQuery(ip);
+}
+----
+
+*注意*:
+
+* これらのすべての操作は、`twitter` プロパティに保存されているクライアントインスタンスのメソッドをコールします。
+* @Optional、@Default、@Placement などのアノテーションは、コネクタの設定動作や Studio での外観を改善するために広く使用されています。
+* 認証はすべて上記の Java クライアントと @Connector クラスのいくつかのメソッドで処理されるため、認証関連のコードは @Processor メソッドに含まれません。
+
+
+=== 操作の JavaDoc とサンプルの作成
+
+各操作の JavaDoc には、サンプルコードファイルへのポインタが含まれます。
+
+`../../../doc/twitter-connector.xml.sample`
+
+DevKit では、通常の `@param` および `@return` コメントの他に、これらのコードサンプルを含める必要があります。提供するサンプルは、それらの操作に定義されているパラメータに対してチェックされます。各操作で必要なドキュメントの作成についての詳細はxref:connector-reference-documentation.adoc[「コネクタリファレンスドキュメント」]を参照してください。
+
+=== 操作の単体テストの作成
+
+各操作を定義するときに、それを利用する単体テストを作成する必要があります。DevKit Maven アーキタイプで作成されるプロジェクトスケルトンの場合、`./src/test` に単体テストスイートディレクトリが含まれます。DevKit は、JUnit に基づいて単体テストフレームワークを定義します。
+
+単体テストの作成についての詳細は、xref:developing-devkit-connector-tests.adoc[「DevKit コネクタテストの開発」]を参照してください。
+
+== 次のステップ
+
+さまざまなコネクタ実装種別を確認するだけであれば、xref:connector-attributes-and-operations.adoc[「コネクタの属性と操作」]やxref:connector-attributes-and-operations.adoc#static-versus-dynamic-data-models[「データモデル」]に戻り、事前構築された SDK を使用せずに SOAP および RESTful Web サービスと直接通信するコネクタ実装を確認できます。
+
+操作が含まれるコネクタの実装、ドキュメントの作成、スイートのテストが完了したら、次の作業を行うことができます。
+
+* xref:index.adoc#development-steps[「DevKit 開発手順」]に戻り、そこに記載されている開発プロセスを続行する
+* xref:developing-devkit-connector-tests.adoc[「DevKit コネクタテストの開発」]の情報に基づいてテストスイートを構築し、カバー率を改善する
+* xref:connector-reference-documentation.adoc[「コネクタリファレンスドキュメント」]の情報に基づいてドキュメントサンプルを構築し、表示されるサンプルを増やす

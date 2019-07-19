@@ -1,0 +1,285 @@
+= Anypoint コネクタ DevKit について
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, 開発, 機能, アーキテクチャ
+
+*Anypoint コネクタ DevKit* (または単に *DevKit*) は、xref:3.9@mule-runtime::anypoint-connectors.adoc[Anypoint コネクタ]の開発を可能にします。*Anypoint コネクタ*​は、サードパーティシステム/API と Mule アプリケーション間の通信を促進する、MuleSoft Anypoint Platform の拡張モジュールです。
+
+[NOTE]
+====
+*Anypoint コネクタ DevKit 3.9 は最新バージョンの DevKit* であり、Studio での Mule アプリケーション設計のいくつかの側面でコネクタのエンドユーザサポートを提供します。DevKit を使用したコネクタコードの記述に関する要件と推奨事項は、バージョン 3.9 以降変わっていません。
+
+xref:release-notes::connector-devkit/anypoint-connector-devkit-3.9.x-release-notes.adoc[Anypoint コネクタ DevKit 3.9.x リリースノート]
+====
+
+[IMPORTANT]
+*DevKit バージョン番号*​は Mule のバージョン設定に従っていません。*DevKit 3.9* で作成されたコネクタは *Mule 3.5.3 以降*​で動作します。
+
+== DevKit を使用したコネクタの開発
+
+Anypoint Studio のインスタンスを使用してシステムで *DevKit ベースの Anypoint コネクタ*​を開発するために必要な手順を次に示します。
+
+. コネクタを作成してテストするには、xref:setting-up-your-dev-environment.adoc[ここ]で http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html[Java JDK バージョン 8]、&#8203;https://maven.apache.org/download.cgi[Apache Maven]、&#8203;https://www.mulesoft.com/lp/dl/studio[Anypoint Studio]、および xref:setting-up-your-dev-environment.adoc[Anypoint DevKit Plugin] の詳細なインストール手順を参照してください。コネクタは Windows、Mac、または Linux を使用して開発できます。
+. _新しいコネクタ:_
+* xref:creating-an-anypoint-connector-project.adoc[Anypoint コネクタプロジェクトを作成します]
+
++
+_既存のコネクタ:_
+* *[File (ファイル)]* > *[Import (インポート)]* > *[Anypoint Studio]* > *[Anypoint Connector Project from External Location (外部の場所からの Anypoint コネクタプロジェクト)]* をクリックし、URL または .zip ファイルを選択して、ウィザードを完了し、プロジェクトの検索とインポートを行います。
++
+xref:creating-a-soap-connector.adoc[「SOAP コネクタの作成」]も参照してください。
+. xref:setting-up-api-access.adoc[リソースアクセスを決定します] - リソースごとにアクセス方法は異なります (REST、SOAP、FTP、Java SDK 機能など)。
+. xref:authentication.adoc[認証メカニズムを選択します] - Mule は OAuth V1 または V2 と、ユーザ名とパスワードの認証 (xref:connection-management.adoc[接続管理]とも呼ばれる) をサポートします。これらは、API キー、SAML、NTLM、Kerberos、または LDAP などのプロトコルで使用できます。
+. xref:connector-attributes-and-operations.adoc[コネクタのデータモデルを選択します] - モデルには静的 Java オブジェクトまたは動的オブジェクトを使用できます。xref:5@studio::datasense.adoc[DataSense] を使用できます - 対象リソースが何の情報を期待しているかを判別します。
+. xref:defining-connector-attributes.adoc[コネクタの @ 属性アノテーションを追加します] - コネクタの重要な部分を指定するために Mule が使用する @ 属性を含むコネクタのコードを作成します。
+. xref:developing-devkit-connector-tests.adoc[テストをコーディングします] - テストには、単体テスト、機能テスト、および Studio の相互運用性テストがあります。
+. xref:connector-reference-documentation.adoc[コネクタをドキュメント化します] - MuleSoft には、空白に入力することでドキュメントを容易に作成できるテンプレートが用意されています。このドキュメントは、スタッフと他のユーザがコネクタの機能と使用方法を理解するのに役立ちます。
+. xref:packaging-your-connector-for-release.adoc[コネクタをパッケージ化します]。
+
+== DevKit 機能
+
+DevKit は以下の機能を提供します。
+
+* Anypoint Studio と、開発を簡素化および高速化する Eclipse ベースのインターフェースを使用するビジュアルデザインおよび実装。
+* Maven サポート。
+* コネクタパッケージ化ツール。
+* OAuth、ユーザとパスワードの認証を含む、複数の認証種別のサポート。
+* リモートメタデータを取得するための DataSense サポート。
+* 広範なテスト機能。
+* 開発の開始を簡素化するためのサンプル、トレーニング、サポート。
+* バッチ、クエリのページネーション、および DataSense クエリ言語のサポート。
+
+DevKit は、その機能をサポートするために使用できる広範なアノテーションセットを備えたアノテーションベースのツールです。DevKit アノテーションの完全なリストについては、&#8203;http://mulesoft.github.io/mule-devkit/[Annotation リファレンス] を参照してください。
+
+== コネクタとは?
+
+Anypoint コネクタは、Mule アプリケーションと外部リソース (データベース、API など) 間のやり取りを REST、SOAP、または Java SDK を介して容易にする拡張モジュールです。
+
+インテグレーション開発者に API の複雑さを見せない再利用可能なコンポーネントとして、カスタムコネクタは、SaaS やオンプレミスの Web サービス、アプリケーション、およびデータソースとのインテグレーションを容易にします。Mule Runtime 環境を実行する Anypoint Studio で Anypoint DevKit を使用して作成されたコネクタは、Anypoint Platform の拡張機能として動作します。
+
+=== コネクタアーキテクチャ
+
+コネクタは、Mule フローから作成された Mule アプリケーション内、および対象のリソースである外部リソース内で動作します。
+
+image::devkitoverviewarchitecture.png[DevKitOverviewArchitecture]
+
+Mule コネクタには 2 つの操作サイドがあります。Mule 方向のサイドがリソースの対象方向のクライアントサイドと通信することで、コンテンツは Mule アプリケーションと外部対象方向のリソースとの間を移動できます。
+
+==== Mule 方向の機能
+
+Mule 方向のサイドでは、コネクタは以下で構成されます。
+
+* *メイン Java クラス*。`@Connector` 属性のアノテーションを付加した Java コード。Anypoint コネクタ DevKit のアノテーションについての詳細は、&#8203;http://mulesoft.github.io/mule-devkit/[Anypoint DevKit API リファレンス] を参照してください。アノテーションの機能についての詳細は、&#8203;http://en.wikipedia.org/wiki/Java_annotation[Java アノテーション]を参照してください。
+* *コネクタ属性*。`@Configurable` 属性のアノテーションが付加される `@Connector` クラスのプロパティ。
+* *メソッド*。`@Processor` 属性のアノテーションが付加される機能。
+
+他のアノテーションでは、接続管理など、認証関連の機能を定義します。アノテーションを使用すると、コネクタの Anypoint Studio ダイアログのレイアウトを制御することもできます。データモデルと、発生または伝播する例外も Mule 方向のクラスです。
+
+Studio で Anypoint コネクタプロジェクトを作成すると、DevKit はスキャフォールディングコネクタを生成します。このスキャフォールディングコネクタには、コネクタを作成するための `@Connector` クラス、`@Configurable` 属性、`@Processor` メソッド、および認証ロジックが含まれます。
+
+==== 対象方向の機能
+
+コネクタの対象方向サイドまたはクライアント方向サイドは、リソースへのアクセスを可能にするクライアントテクノロジによって異なります。この機能は、クラスライブラリと、クライアント機能にアクセスするために `@Connector` クラスで使用される 1 つ以上のクラスで構成されます。この機能はクライアントクラスと呼ばれます。
+
+一般に、クライアントクラスは他のクラスを使用して、対象のリソースへのコールを実際に実装します。対象によっては、この一部のクラスが自動的に生成または提供される場合があります。たとえば、Java クライアントライブラリがあるか、SOAP または REST サービスを使用している場合、ほとんどのクライアントコードがその場所に実装されます。これ以外の場合は、コードを自分で記述する必要があります。
+
+== コネクタのコーディング
+
+DevKit を使用するとコネクタを最初から作成できます。独自のコネクタを作成する前に、&#8203;https://www.anypoint.mulesoft.com/exchange/?type=connector[Anypoint Exchange] を参照して、使用可能なコネクタがないかどうかを確認してください。コネクタページには、オープンソースのコミュニティコネクタもリストされており、これを使用して、成長する公開コネクタ開発コミュニティに寄与できます。
+
+=== コネクタデータモデル
+
+コネクタのデータモデルは、公開された操作に渡すまたは公開された操作から渡されるオブジェクトで構成されます。多くの Web サービスが XML または JSON データを受け入れて返しますが、適切な Mule コネクタでは、クライアントが使用するデータ形式を Java オブジェクト (対象に送信するまたは対象から返されるデータオブジェクトを表す POJO またはキー-値のマップ) に変換する必要があります。  (未加工の XML または JSON 応答を Mule に返すことは、不適切に実装された未熟なコネクタを表す 1 つの印です)。
+
+=== REST と SOAP の比較
+
+REST は、リソースの情報を作成、取得、追加、削除するためのアクセス権を提供する POST、GET、PUT、DELETE コールを使用して、HTTP へのアクセスを簡素化します。
+
+SOAP はリソースと通信するための従来の方法であり、WSDL ファイルを必要とします。WSDL ファイルは、Java クラスの構造、メソッド、プロパティ、およびドキュメントのあらゆる側面を指定する XML ファイルです。SOAP は、ガバナンス情報、作成情報、およびスキーマ情報用のツールを備えた業界標準です。DevKit は、WSDL ファイルを使用してコネクタを作成するのに役立つツールを提供します。
+
+
+=== DevKit 3.9 のデフォルトのコネクタプロジェクトクラス
+
+次に、DevKit 3.9 で作成される開始 `@Connector` クラスおよび `@Configuration` クラスの例を示します。
+
+[source,java,linenums]
+----
+
+package org.mule.modules.newconnector;
+
+import org.mule.api.annotations.Config;
+import org.mule.api.annotations.Connector;
+import org.mule.api.annotations.Processor;
+
+import org.mule.modules.connpom.config.ConnectorConfig;
+
+@Connector(name="connpom", friendlyName="Connpom")
+public class ConnpomConnector {
+
+    @Config
+    ConnectorConfig config;
+
+    /**
+     * Custom processor
+     *
+     * @param friend Name to be used to generate a greeting message.
+     * @return A greeting message
+     */
+    @Processor
+    public String greet(String friend) {
+        /*
+         * MESSAGE PROCESSOR CODE GOES HERE
+         */
+        return config.getGreeting() + " " + friend + ". " + config.getReply();
+    }
+
+    public ConnectorConfig getConfig() {
+        return config;
+    }
+
+    public void setConfig(ConnectorConfig config) {
+        this.config = config;
+    }
+
+}
+----
+
+DevKit 3.9 の `@Configuration` クラスは次のとおりです。
+
+[source,java,linenums]
+----
+package org.mule.modules.newconnector.config;
+
+import org.mule.api.annotations.components.Configuration;
+import org.mule.api.annotations.Configurable;
+import org.mule.api.annotations.param.Default;
+
+@Configuration(friendlyName = "Configuration")
+public class ConnectorConfig {
+
+    /**
+     * Greeting message
+     */
+    @Configurable
+    @Default("Hello")
+    private String greeting;
+
+    /**
+     * Reply message
+     */
+    @Configurable
+    @Default("How are you?")
+    private String reply;
+
+    /**
+     * Set greeting message
+     *
+     * @param greeting the greeting message
+     */
+    public void setGreeting(String greeting) {
+        this.greeting = greeting;
+    }
+
+    /**
+     * Get greeting message
+     */
+    public String getGreeting() {
+        return this.greeting;
+    }
+
+    /**
+     * Set reply
+     *
+     * @param reply the reply
+     */
+    public void setReply(String reply) {
+        this.reply = reply;
+    }
+
+    /**
+     * Get reply
+     */
+    public String getReply() {
+        return this.reply;
+    }
+
+}
+----
+
+=== DevKit 3.9 のデフォルトの pom.xml
+
+DevKit 3.9 プロジェクトの `pom.xml` ファイル。`<parent>` セクションに DevKit のグループ ID `org.mule.tools.devkit` が示されています。
+
+
+[source,xml,linenums]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.mule.modules</groupId>
+    <artifactId>newconnector-connector</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>mule-module</packaging>
+    <name>Mule Newconnector Anypoint Connector</name>
+
+    <parent>
+        <groupId>org.mule.tools.devkit</groupId>
+        <artifactId>mule-devkit-parent</artifactId>
+        <version>3.9.0</version>
+    </parent>
+
+    <properties>
+        <category>Community</category>
+        <licensePath>LICENSE.md</licensePath>
+        <devkit.studio.package.skip>false</devkit.studio.package.skip>
+    </properties>
+    <repositories>
+        <repository>
+            <id>mulesoft-releases</id>
+            <name>MuleSoft Releases Repository</name>
+            <url>http://repository.mulesoft.org/releases/</url>
+            <layout>default</layout>
+        </repository>
+    </repositories>
+</project>
+----
+
+== DevKit がサポートするコネクタ機能
+
+*認証種別*
+
+* xref:connection-management.adoc[接続管理] (ユーザ名とパスワード認証)
+* xref:oauth-v1.adoc[OAuth V1]
+* xref:oauth-v2.adoc[OAuth V2]
+* 他の認証スキーマ: xref:authentication-methods.adoc[認証方法]
+
+*API 種別*
+
+* xref:creating-a-connector-for-a-soap-service-via-cxf-client.adoc[SOAP API]
+* xref:creating-a-connector-using-a-java-sdk.adoc[Java SDK]
+
+*データの処理および取得*
+
+* xref:adding-datasense.adoc[DataSense]
+* xref:adding-datasense-query-language.adoc[DataSense クエリ言語]
+* xref:adding-query-pagination-support.adoc[クエリのページネーション]
+* xref:building-a-batch-enabled-connector.adoc[バッチ]
+* xref:installing-and-testing-your-connector-in-studio.adoc[Anypoint Studio サポート]
+
+*コネクタ開発ライフサイクル*
+
+* xref:setting-up-your-dev-environment.adoc[コネクタプロジェクトのセットアップ]
+* xref:creating-a-java-sdk-based-connector.adoc[コネクタコードの記述]
+* xref:developing-devkit-connector-tests.adoc[コネクタテストの記述]
+* xref:connector-reference-documentation.adoc[コネクタプロジェクトのドキュメント化]
+* xref:packaging-your-connector-for-release.adoc[コネクタのパッケージ化]
+
+== 関連情報
+
+* xref:anypoint-connector-development.adoc[コネクタ開発]
+* xref:3.9@mule-runtime::anypoint-connectors.adoc[Anypoint コネクタ]
+* https://www.anypoint.mulesoft.com/exchange/?type=connector[Exchange のコネクタ]
+* http://blogs.mulesoft.com/dev/anypoint-studio-dev/change-the-studio-category-of-your-devkit-component/[DevKit 拡張カテゴリの変更方法に関するブログ投稿]
+* xref:6@studio::datasense-enabled-connectors.adoc[DataSense 対応コネクタ]

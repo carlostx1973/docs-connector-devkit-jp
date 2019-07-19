@@ -1,0 +1,222 @@
+= コネクタプロジェクト構造
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, コネクタ, クラス, フォルダ, 構造, ライセンス, readme, リファレンスドキュメント, apidocs, ベストプラクティス
+
+このドキュメントでは、xref:creating-an-anypoint-connector-project.adoc[Anypoint コネクタプロジェクトの作成]後に生成されるフォルダ構造とファイルについて説明します。
+
+== 前提条件
+
+このドキュメントは、読者が xref:creating-an-anypoint-connector-project.adoc[新しいコネクタプロジェクトを作成]していることを前提としています。Eclipse または Anypoint Studio では、コネクタプロジェクトディレクトリは次のようになります。
+
+image::barn-connector-screenshot.png[]
+
+== ソースフォルダ
+
+*ソースフォルダ*​では、最終的に target フォルダを構築するために必要なすべての入力が収集されます。最初に実行した Maven コマンドで Mule コネクタアーキタイプが使用され、次の表で説明する 4 つのパスが含まれるソースフォルダにスケルトンが生成されています。
+
+image::scr-main-java-sc.png[]
+
+[%header,cols="2*"]
+|===
+a|
+フォルダ
+
+ a|
+説明
+
+|`src/main/java` |コネクタのソース Java ファイルがあります (操作と接続設定のそれぞれのスケルトン Java ファイルなど)。追加のサポートクラスもここに保存されます。
+|`src/main/resources` |コネクタでアクセスするコード以外のリソースがあります。プロジェクトを最初に作成するときは、このフォルダは空です。
+|`src/test/java` |コネクタのテストファイルの Java ソースがあります (スケルトン JUnit テストケースなど)。
+|`src/test/resources` |テストでアクセスするコード以外のリソースがあります。このフォルダには、テストを実行するためのスケルトン Mule 設定ファイルが含まれます。
+|===
+
+=== Connector クラス
+
+*`src/main/java/org/mule/modules/barn/BarnConnector.java`* ファイルを開きます。このクラスでは、コネクタのメインクラスを定義し、重要な `@Connector` アノテーションが含まれます。
+
+image::connector-class-sc.png[]
+
+DevKit ですでに 1 つのクラスといくつかのメソッドが作成されていて、それらに​*アノテーション*​が付加されています。アノテーションは、クラス、メソッド、パラメータをコールおよび処理する方法を事前定義された特定の方法で Mule に通知します。これらは Mule との唯一の接点で、各自で管理する必要があります。
+
+==== @Connector
+
+コネクタクラス自体に適用されるコネクタの最上位アノテーションは `@Connector` です。このアノテーションは、Java クラスがコネクタとして機能することを DevKit に通知します。DevKit 3.6 以降、接続は @Connector レベルでサポートされなくなりました。<<configuration-class,設定クラス>>についての詳細は、以下を参照してください。
+
+[source,java,linenums]
+----
+/**
+ * Anypoint Connector
+ *
+ * @author MuleSoft, Inc.
+ */
+@Connector(name="barn", schemaVersion="1.0", friendlyName="Barn", minMuleVersion="3.5")
+public class BarnConnector
+{
+    /**
+     * Configurable
+     */
+    @Configurable
+    private String myProperty;
+    ...
+}
+----
+
+`@Connector` アノテーションには、複数のパラメータが含まれますが、その一部はアーキタイプによって自動的に生成されています (`name` や `schemaVersion` など)。以下の表に示すように他のパラメータも定義できます。
+
+[source,java,linenums]
+----
+@Connector(name="barn", schemaVersion="1.0", friendlyName="Barn", minMuleVersion="3.5")
+public class BarnConnector
+----
+
+[%header,cols="4*"]
+|===
+a|アノテーション種別要素
+a|説明
+a|必須かどうか
+a|デフォルト値
+
+|`name`
+|コネクタの名前。この値は、スペースなしの単純な文字列である必要があります。
+|✓
+|
+
+|`schemaVersion`
+|DevKit によって生成されるスキーマのバージョン。
+|
+|`1.0-SNAPSHOT`
+
+|`friendlyName`
+|これは、人間が解読できるコネクタ名です。この名前には、スペースを含めることができます。Studio パレットのコネクタに表示ラベルを付ける場合にのみ Mule で使用されます。
+|✓
+|
+
+|`description`
+|コネクタとその操作を説明するより長い文字列。Anypoint Studio には、ツールチップとして説明が表示されます。
+|
+|
+
+|`namespace`
+|コネクタの名前空間。
+|
+|`+http://www.mulesoft.org/schema/mule/name+`
+
+|`schemaLocation`
+|`spring.schemas` ファイルに書き込まれるスキーマファイルの場所。
+|
+|`+http:/www.mulesoft.org/schema/mule/name/schemaversion/mule-name.xsd+` +
+および +
+`+http://www.mulesoft.org/schema/mule/name/current/mule-name.xsd+`
+
+|`minMuleVersion`
+|コネクタを使用できる Mule の最小バージョン。Mule は、実行時にバージョンをチェックし、互換性がないバージョンの場合にエラーをスローします。
+|
+|最新の安定した Mule Runtime リリース
+|===
+
+`@Connector` アノテーションには、次の制限が適用されます。
+
+* `@Connector` はインターフェースに適用できない。
+* `@Connector` は最終クラスに適用できない。
+* `@Connector` はパラメータ化されたクラスに適用できない。
+* `@Connector` は public 以外のクラスに適用できない。
+* `@Connector` のあるクラスには、`@Connect` アノテーションが付加された 1 つのメソッドのみが含まれている必要がある。
+* `@Connector` のあるクラスには、`@Disconnect` アノテーションが付加された 1 つのメソッドのみが含まれている必要がある。
+
+[[configuration-class]]
+=== 設定クラス
+
+DevKit 3.7 以降では、「設定」クラスとみなされる個別のクラスで外部サービスへの接続を定義する必要があります。
+
+`@Connector` クラスの項目に `@Config` アノテーションを付加して、設定をコネクタコードに挿入します。接続の定義についての詳細は、xref:connector-connection-strategies.adoc[コネクタ接続戦略]についての説明を参照してください。
+
+== コネクタのテスト
+
+*`src/test/java/org/mule/modules/barn/BarnConnectorTest.java`* ファイルを開きます。
+
+image::test-java-sc.png[]
+
+DevKit でクラス、いくつかのメソッド、設定可能なプロパティが作成されていて、すべてにアノテーションが付加されています。このクラスのメソッド内で、テストニーズに合わせて独自のテストを作成できます。これらのテストは、コードをコンパイルするたびに評価されます。これらのテストは、コンソールから次の Maven コマンドを実行して、コネクタを構築せずに実施することもできます。
+
+[source,text,linenums]
+----
+mvn test
+----
+
+コネクタのテストの開発についての詳細は、xref:developing-devkit-connector-tests.adoc[「DevKit コネクタテストの開発」]を参照してください。
+
+== POM ファイル
+
+Maven は、プロジェクトの作成に使用されるアーキタイプに基づいて、プロジェクトオブジェクトモデル (POM) ファイルを生成します。Maven は、`pom.xml` ファイルを使用して、プロジェクトの構築に必要なすべての連動関係 (連動関係のバージョン番号や場所を含む) を追跡します。追加ライブラリを取り込んだり、構築プロセスにステップを追加したりするために、コネクタ開発プロセスで POM ファイルに項目を追加することが必要になる場合もあります。
+
+image::pom-sc.png[]
+
+POM ファイルの役割についての詳細は、&#8203;http://maven.apache.org/pom.html[maven.apache.org の「POM Reference (POM リファレンス)」]を参照してください。
+
+== icons フォルダ
+
+icons フォルダには、パレットとキャンバスの両方でコネクタを表すために Mule Studio で使用されるビジュアルが含まれます。これらのファイルは、他の任意のファイルに簡単にスワップできます。Mule がファイルを取得するフォルダを変更することもできます。
+
+image::icons-sc.png[]
+
+== LICENSE および README ファイル
+
+コネクタを Mule コミュニティで共有する場合、プロジェクトには、xref:packaging-your-connector-for-release.adoc[自由に変更できる]基本ライセンス契約が含まれます。`README` ファイルを使用して、コネクタに関する初期情報をユーザに提供します。リリースノートを公開するための `CHANGELOG.md` ファイルも作成することをお勧めします。これらのファイルは、&#8203;https://help.github.com/articles/github-flavored-markdown[Github-Flavored Markdown] 形式 `(.md)` で作成されます。
+
+image::connector-license.png[connector_license]
+
+== 生成先フォルダ
+
+構築プロセスが正常に完了し、`test` フォルダで定義されているすべてのテストに合格すると、Maven 構築プロセスによって生成先フォルダにいくつかのアーティファクトが作成されます。
+
+image::target-sc.png[]
+
+構築プロセスを実行したが、Package Explorer にこのフォルダが表示されない場合は、プロジェクト名を右クリックし、*[Refresh (更新)]* を選択して次の新しい要素を表示します。
+
+image::updated-target-sc.png[]
+
+* `barn-connector-1.0-SNAPSHOT.jar` - コネクタ JAR。
+* `barn-connector-1.0-SNAPSHOT.zip` - Mule スタンドアロンの `plugins` ディレクトリにドロップできる Mule プラグイン。
+* `UpdateSite.zip` - あなた (またはコネクタを使用するユーザ) が Anypoint Studio にインポートして、コネクタをインストールまたは更新できるファイル。
+
+プロジェクトを右クリックし、*[Anypoint Connector (Anypoint コネクタ)]* > *[Preview Documentation (ドキュメントをプレビュー)]* を選択して、ドキュメントを生成することもできます。この作業を行うと、コネクタの自動生成されたインストール手順、Javadoc、Mule API ドキュメントが含まれる生成先フォルダに`apidocs` も追加されます。
+
+image::apidocs-sc.png[]
+
+== リファレンスドキュメント
+
+この構築により、コネクタの Javadoc も自動生成されます。Maven によって生成されるスケルトンファイルには、(`/*` と `*/`で囲まれた) プレースホルダコメントがすでに含まれていますが、このコメントはさらに更新できます。Mule では、構築プロセスでアノテーションが自動生成されたドキュメントに自動的に取り込まれるため、機能をコネクタに追加するときは JavaDoc アノテーションをコードに正確に追加してください。
+
+[source,java,linenums]
+----
+/**
+ * Custom processor that places an animal in the barn.
+ *
+ * {@sample.xml ../../../doc/barn-connector.xml.sample barn:putInBarn}
+ *
+ * @param animal Name of the animal to be place in the barn
+ * @return returns processed message
+ */
+@Processor
+public String putInBarn(String animal) {
+    return animal + " has been placed in the barn";
+}
+----
+
+このドキュメントをプレビューするには、Web ブラウザで `target/apidocs/index.html` を開きます。
+
+image::doc-index-sc.png[]
+
+=== ドキュメントのベストプラクティス
+
+DevKit では、コードのコメントが適用されます。作成するメソッドごとに対応するコメントセクションを追加し、構築直後にコネクタの機能が文書化されるようにします。これらのコメントセクションで、`@param` および `@return` アノテーションを使用して、メソッドのすべてのパラメータと出力をリストします。
+
+以下の例では、DevKit は上記のサンプルコードの `@param` および `@return` コンテンツを Javadoc に取り込みます。このとき、自動的に整理と書式設定が行われ、標準コンテンツが追加されます。
+
+image::method-doc-sc.png[]
+
+== 関連情報
+
+*次へ:* コネクタのxref:authentication.adoc[認証][認証の選択と実装] メソッドの選択と実装に進みます。

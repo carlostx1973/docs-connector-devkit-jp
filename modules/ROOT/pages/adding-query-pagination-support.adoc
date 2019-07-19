@@ -1,0 +1,126 @@
+= クエリページネーションサポートの追加
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, ページネーション, @Paged, @Processor
+
+大量のレコードを処理する場合は、クエリページネーションが必要になります。この主な利点は、Mule Runtime がメモリ内のすべてのレコードを同時に処理する代わりに、一度にまとまったレコードを部分的に処理する場合のパフォーマンスです。
+
+[NOTE]
+コネクタにページネーションを実装するには、接続する​*サービスの API* で​*ページネーション機能が提供される*​ことを確認してください。
+
+[NOTE]
+コネクタでページネーションを有効にすると、返されるプロセッサの種別が変更される可能性があるため、(Mule Runtime 3.5.x より前の) 古い Mule バージョンとの後方互換性がなくなる可能性があります。
+
+== ページネーションの有効化
+
+コネクタでのページネーションの有効化は非常に簡単です。`@Processor` メソッドが満たす必要がある条件は 3 つのみです。
+
+. メソッドに `@Paged` のアノテーションを付加する
+. `org.mule.api.streaming.PagingConfiguration` 型のパラメータを受け取る必要がある
+. 戻り値のデータ型は `ProviderAwarePagingDelegate` である必要がある
+
+[source,java,linenums]
+----
+@Paged
+@Processor
+    public ProviderAwarePagingDelegate query(String query, final PagingConfiguration pagingConfiguration) throws Exception
+{
+    return new CustomPagingDelegate(query,pagingConfiguration);
+}
+
+public QueryResult executeQuery(String query, String nextItem) throws Exception {
+        myServiceClient.query(query,nextItem);
+}
+----
+
+*注意*: `@Processor` メソッドと操作 `executeQuery` の違い。プロセッサは、後で (ページを取得するときに) すでに接続されているコネクタインスタンスを受け取り、それに応じて `executeQuery` を実行する `PagingDelegate` を返します。
+
+== CustomPagingDelegate の作成
+
+`ProviderAwarePagingDelegate` は、ページネーションが実行される場所です。2 種類の引数 (この場合は T と P) が必要な `ProviderAwarePagingDelegate` 抽象クラスを見てみましょう。次のクラス定義では、T は返されるデータを表し、P はデータのプロバイダである Anypoint コネクタを表します。
+
+[source,java,linenums]
+----
+public abstract class ProviderAwarePagingDelegate<T, P> implements Closeable
+
+{
+    /**
+     * Returns the next page of items. If the return value is
+     * <code>null</code> or an empty list, then it means
+     * no more items are available
+     *
+     * @param provider The provider to be used to do the query.
+     * You can assume this provider is already properly initialised
+     * @return a populated list of elements. <code>null</code>
+     * or an empty list, then it means no more items are available
+     * @throws Exception
+     */
+    public abstract List<T> getPage(P provider) throws Exception;
+
+    /**
+     * Returns the total amount of items in the non-paged result set.
+     * In some scenarios, it might not be possible or
+     * convenient to actually retrieve this value. -1 is
+     * returned in such a case.
+     *
+     * @param provider The provider to be used to do the query.
+     * You can assume this provider is already properly initialised.
+     */
+    public abstract int getTotalResults(P provider) throws Exception;
+
+    /**
+     * Close whatever external resource you might use
+     */
+    @Override
+    public void close() throws MuleException;
+
+}
+----
+
+メソッド `getPage(P provider)` および `getTotalResults(P provider)` を実行すると、Anypoint コネクタ DevKit は接続プールから適切なコネクタのインスタンスを選択します。
+
+[source,java,linenums]
+----
+/**
+ * Example of Paging Delegate implementation
+ */
+public class CustomPagingDelegate extends ProviderAwarePagingDelegate<Item,CustomConnector> {
+    List<Item> cachedPage;
+    String query;
+    String nextItem;
+    int totalItems = -1;
+
+    public CustomPagingDelegate(String query, PagingConfiguration pagingConfiguration) {
+        this.query = query;
+    }
+
+    @Override
+    public List<Item> getPage(CustomConnector provider) throws Exception {
+        if (cachedPage != null) return cachedPage;
+        QueryResult queryResult = provider.executeQuery(query,nextItem);
+        nextItem = queryResult.nextItem();
+        return queryResult.items();
+    }
+    @Override
+    public int getTotalResults(CustomConnector provider) throws Exception {
+        if (totalItems != -1) return totalItems;
+        QueryResult queryResult = provider.executeQuery(query,nextItem);
+        nextItem = queryResult.nextItem();
+        totalItems = queryResult.totalItemsCount();
+        cachedPage = queryResult.items();
+        return totalItems;
+    }
+    @Override
+    public void close() throws MuleException {
+        //Close whatever external resource you might use
+    }
+}
+----
+
+`ProviderAwarePagingDelegate` の独自のバージョンを作成するには、それを拡張する必要があります。このクラスの単純な拡張例を次に示します。
+
+== 関連情報
+
+* *次へ*: コネクタへのxref:developing-devkit-connector-tests.adoc[テスト]の追加方法の学習。
+* xref:connector-reference-documentation.adoc[リファレンスドキュメント]の作成。

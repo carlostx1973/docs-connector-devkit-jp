@@ -1,0 +1,354 @@
+= 複合データ型の属性
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, データ, 複合データ型, 列挙型, 列挙型クラス, コレクション, list, map, Spring bean
+
+Mule とコネクタ間の 1 つのインテグレーションポイントは、コンポーネントの設定時などにコネクタと Mule ESB の間で渡されるデータです。プリミティブデータ型は簡単ですが、列挙型、配列、および複合型は特別な処理が必要です。
+
+== 列挙型
+
+Anypoint DevKit には、列挙型を処理する簡単な方法があります。`@Processor` または `@Source` のアノテーションが付加されたメソッドは、列挙型をパラメータとして受け取ることができます。これらは Mule から文字列として渡すことができます。`java.lang.Collection` および `java.lang.Map` と共に列挙型を使用することもできます。
+
+次の拡張を考えてみます。
+
+[source,java,linenums]
+----
+@Connector(name="my-connector")
+public class MyConnector {
+
+    private Map<Property, String> properties;
+
+    @Configurable
+    private Property myProperty;
+
+    @Processor
+    public void setProperties(Map<Property, String> properties) {
+        this.properties = properties;
+    }
+
+    @Processor
+    public String getPropertyValue(Property property) {
+        return properties.get(property);
+    }
+----
+
+次の `enum` クラスを使用します。
+
+[source,java,linenums]
+----
+public enum Property {
+    FIRST_NAME, LAST_NAME, ADDRESS
+}
+----
+
+この場合、次の列挙型とフローが有効です。
+
+[source,xml,linenums]
+----
+<my-connector:config myProperty="FIRST_NAME"/>
+----
+
+[source,xml,linenums]
+----
+<flow name="setProperties">
+    <my-connector:set-properties>
+        <my-connector:properties>
+            <my-connector:property key="FIRST_NAME">Muley</enums:property>
+            <my-connector:property key="LAST_NAME">The Mule</enums:property>
+        </my-connector:properties>
+    </my-connector:set-properties>
+</flow>
+----
+
+[source,xml,linenums]
+----
+<flow name="getPropertyValue">
+    <my-connector:get-property-value property="LAST_NAME"/>
+</flow>
+----
+
+=== しくみ
+
+内部では、Anypoint DevKit は `@Processor` および `@Source` のパラメータ、または `@Configurable` のアノテーションが付加されたインスタンス項目として表示される列挙型すべてに対して、トランスフォーマを生成します。そのため、列挙型の XML に文字列が入力されると、指定された名前の列挙型定数がメソッドに渡されるか、項目に割り当てられます。
+
+生成されたスキーマファイルには制限も追加されるため、XML 使用できるのは一致する列挙値のみです。  たとえば、`Property` 列挙型で使用可能な値は `FIRST_NAME`、`LAST_NAME,`、`ADDRESS` であるため、次は無効になり、スキーマの検証に失敗します。
+
+[source,xml,linenums]
+----
+<flow name="getPropertyValue">
+    <my-connector:get-property-value property="COUNTRY"/>
+</flow>
+----
+
+== コレクション
+
+Anypoint DevKit には、`@Configurable` 項目に表示されるか、`@Processor` または `@Source` メソッドのパラメータとして表示されるかに関係なく、`java.util.Collection` および `java.util.Map` 型を処理する簡単な方法があります。DevKit では、`Map<String, List<String>>` や `List<Map<String, Object>>` などの型がネストされている複雑なシナリオも可能です。
+
+これらの型を Mule から処理する方法は次の 2 つです。
+
+* 要素を明示的に宣言する。
+* 要素への参照を渡す。
+
+[NOTE]
+このページのすべての例と説明は、`@Connector` クラスで有効です。
+
+=== コレクションの例
+
+次のカスタム Mule コネクタを考えてみます。
+
+[source,java,linenums]
+----
+import org.mule.api.annotations.Configurable;
+import org.mule.api.annotations.Connector;
+import org.mule.api.annotations.Processor;
+import org.mule.api.annotations.param.Optional;
+
+import java.util.List;
+import java.util.Map;
+
+@Connector(name = "collection")
+public class CollectionConnector {
+
+    @Configurable
+    @Optional
+    private List<String> strings;
+
+    @Configurable
+    @Optional
+    private Map<String, String> mapStrings;
+----
+
+次の Spring bean があります。
+
+[source,xml,linenums]
+----
+<spring:bean id="objectA" class="java.lang.String">
+    <spring:constructor-arg value="ObjectA"/>
+</spring:bean>
+
+<spring:bean id="objectB" class="java.lang.String">
+    <spring:constructor-arg value="ObjectB"/>
+</spring:bean>
+
+<spring:bean id="list" class="org.springframework.beans.factory.config.ListFactoryBean">
+    <spring:property name="sourceList">
+        <spring:list>
+            <spring:ref bean="objectA"/>
+            <spring:ref bean="objectB"/>
+        </spring:list>
+    </spring:property>
+</spring:bean>
+----
+
+次のいずれかの方法でコネクタを設定できます。
+
+* list 要素を明示的に宣言する。
++
+[source,xml,linenums]
+----
+<collection:config>
+    <collection:strings>
+        <collection:string>MuleSoft</collection:string>
+        <collection:string>FTW</collection:string>
+    </collection:strings>
+</collection:config>
+----
++
+* map 要素を明示的に宣言する。
++
+[source,xml,linenums]
+----
+<collection:config>
+    <collection:map-strings>
+        <collection:map-string key="a">MuleSoft</collection:map-string>
+        <collection:map-string key="b">FTW</collection:map-string>
+    </collection:map-strings>
+</collection:config>
+----
++
+* 前の map のように、タグ名 (`a` および `b`) をキーとして使用する。
++
+[source,xml,linenums]
+----
+<collection:count-map-of-strings config-ref="configC">
+    <collection:map-strings>
+        <collection:a>mulesoft</collection:a>
+        <collection:b>ftw</collection:b>
+    </collection:map-strings>
+</collection:count-map-of-strings>
+----
++
+* 一方の要素を明示的に宣言し、もう一方の要素の参照を使用する。
++
+[source,xml,linenums]
+----
+<collection:config>
+    <collection:strings>
+        <collection:string>MuleSoft</collection:string>
+        <collection:string value-ref="objectA"/>
+    </collection:strings>
+</collection:config>
+----
++
+* list の要素を宣言する代わりに、同じ型の bean への参照を渡す。
++
+[source,xml,linenums]
+----
+<collection:config name="configA">
+    <collection:strings ref="list" />
+</collection:config>
+----
+
+
+== ネストされたコレクション
+
+ここで、次の `@Processor` メソッドを考えてみます。
+
+[source,java,linenums]
+----
+@Processor
+public void mapOfLists(Map<String, List<String>> map) {
+----
+
+生成されたメッセージプロセッサを次のように呼び出すことができます。
+
+[source,xml,linenums]
+----
+<collection:map-of-lists>
+    <collection:map>
+        <collection:map key="key1" value-ref="list" />
+        <collection:map key="key2" value-ref="#[map-payload:anotherList]" />
+    </collection:map>
+</collection:map-of-lists>
+----
+
+map の値を参照によって渡す代わりに、map 自体を参照にすることもできます。
+
+[source,xml,linenums]
+----
+<collection:map-of-lists>
+    <collection:map ref="#[map-payload:myMap]" />
+</collection:map-of-lists>
+----
+
+== サポートされる複合型
+
+Anypoint DevKit は次の型をサポートしています。
+
+[cols="2*"]
+|===
+a|
+* `int`
+* `float`
+* `long`
+* `byte`
+* `short`
+* `double`
+* `boolean`
+* `char`
+* `java.lang.Integer`
+* `java.lang.Float`
+* `java.lang.Long`
+* `java.lang.Byte`
+
+ a|
+* `java.lang.Short`
+* `java.lang.Double`
+* `java.lang.Boolean`
+* `java.lang.Character`
+* `java.lang.String`
+* `java.math.BigDecimal`
+* `java.math.BigInteger`
+* `java.util.Date`
+* `java.lang.Class`
+* `java.net.URL`
+* `java.net.URI`
+
+|===
+
+他の型を参照によって渡すことができます。
+
+[source,java,linenums]
+----
+@Processor
+public void receiveAComplexType(MyComplexType myComplexType) { ... }
+----
+
+Anypoint DevKit では、特に Anypoint DataMapper がモジュールを使用するときに、このようなプロセッサを使用できます。DataMapper は Java bean と XML の両方からメタデータを抽出できるため、DataMapper 対応のモジュールは bean に情報を渡します。DevKit は Mule が参照を渡す方法の標準化も行います。
+
+== 複合型の作成
+
+`@Processor` メソッドが複合型を受け取ると、Anypoint DevKit はそのオブジェクトを分解してから、そのオブジェクトを再作成するために使用できるスキーマを作成します。これにより、複合型のオブジェクトを簡潔で直感的な XML で表すことができます。次に例を示します。
+
+[source,xml,linenums]
+----
+<ns:receive-a-complex-type>
+    <ns:my-complex-type color="red"/>
+</ns:receive-a-complex-type>
+----
+
+複合型定義内で次のアノテーションを使用して、スキーマ生成を制御できます。
+
+* `@Optional`
+* `@Default`
+
+さらに、複合型は他の複合型の内部に list または map を使用できます。
+
+=== 複合型の項目を無視
+
+`@Ignore` アノテーションは、複合オブジェクト内の項目を無視するように DevKit に指示します。
+
+[source,java,linenums]
+----
+public class MyComplexType
+{
+    private String color;
+
+    @Ignore
+    private String description;
+}
+
+@Processor
+public void receiveAComplexType(MyComplexType myComplexType) { ... }
+----
+
+Anypoint DevKit は、生成されたスキーマから説明項目を除外します。たとえば、下のスニペットは、`@Ignored description` 属性が生成されたスキーマに含まれていないため無効です。DevKit の目的上、XML レベルではこの要素に `description` 属性がありません。
+
+[source,xml,linenums]
+----
+<ns:receive-a-complex-type>
+    <ns:my-complex-type color="red" description=""/>
+</ns:receive-a-complex-type>
+----
+
+=== List オブジェクトと Map オブジェクトの参照による受け渡し
+
+Anypoint DevKit は、オブジェクトを参照によって渡す方法を標準化しています。List オブジェクトと Map オブジェクトは、次の例のように子要素内の `ref` 属性で参照によって渡すことができます。
+
+[source,java,linenums]
+----
+@Processor
+public void receiveAList(List<String> strings) { ... }
+----
+
+[source,xml,linenums]
+----
+<ns:receive-a-list>
+  <ns:strings ref="#[payload]"/>
+</ns:receive-a-list>
+----
+
+Anypoint DevKit では、複合オブジェクトを渡すときにも子要素内の `ref` 属性を使用します。
+
+[source,xml,linenums]
+----
+<ns:receive-a-complex-type>
+    <ns:my-complex-type ref="#[payload]"/>
+</ns:receive-a-complex-type>
+----
+
+== 関連情報
+
+* 次へ: コネクタへのxref:adding-datasense.adoc[ DataSense の追加]に進む。
+* xref:developing-devkit-connector-tests.adoc[コネクタのテスト]方法の学習。

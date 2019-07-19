@@ -1,0 +1,170 @@
+= リリースするコネクタのパッケージ化
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, コネクタ, パッケージ化, ユースケースのドキュメント化, readme
+
+コネクタを幅広い利用者にリリースされる準備が整ったら、次の追加手順を実行してユーザが確実に成功するようにします。
+
+* コネクタのライセンス契約を作成する。
+* xref:release-notes::connector-devkit/anypoint-connector-devkit-3.9.x-release-notes.adoc[DevKit 3.9] を使用してコネクタを構築し、2 つのセットのコネクタのロゴアイコンをパッケージ化して従来と新規の両方の Studio UI をサポートするメリットを確認する。
+* コネクタを使用した一般的なユースケースの実行について説明するためのエンドツーエンドのガイドを作成する。
+* Maven を使用して配布するための圧縮ファイルを作成する。
+
+== 前提条件
+
+このドキュメントの前提条件を次に示します。
+
+* コネクタを開発していること。
+* リリースに備えてコネクタをドキュメント化していること。コネクタのドキュメント化についての追加情報は、次のセクションで説明します。
+* xref:developing-devkit-connector-tests.adoc[「DevKit コネクタテストの開発」]で説明しているようにテストを完了していること。
+
+== パッケージ化前のユースケースのドキュメント化
+
+コネクタをパッケージ化してリリースする前に、コネクタを効果的にドキュメント化することをお勧めします。役に立つドキュメントを作成しておけば、サポートやトレーニングにかかるコストを削減できるだけでなく、顧客満足度を高めることもできます。
+
+ドキュメントに関するヒント:
+
+* *Readme* - 顧客がアクセスしやすくなるように Readme ファイルを提供します。最も優れた Readme ファイルは、インストールウィザード中など、インストール中に自動的に表示されるものです。Readme ではインストールに関する情報を提供するとともに、顧客がコネクタをインストールする前にインストールや設定を行う必要がある必須ソフトウェアについて説明する必要があります。
+* *ユースケース*: 顧客がコネクタを使用する理由、タイミング、方法について説明します。各ユースケースについて、説明と一緒に例を示します。
+* *リリースノート*: コネクタには必ずバージョンを付けて、前のリリースからの変更内容について顧客がわかるようにする必要があります。新機能、既知の問題、修正済みの問題をリストすることをお勧めします。
+* *APIDoc*: Javadoc を活用したxref:connector-reference-documentation.adoc[コネクタリファレンスドキュメント]を作成し、コネクタのルートフォルダからシンプルな Maven コマンドを実行します。
+
+== ライセンス契約およびヘッダーの適用
+
+コネクタをパッケージ化する前に、コネクタライセンスについて使用する用語や言い回しが反映されるようにライセンス契約の内容をカスタマイズできます。パッケージ化されたコネクタのユーザがそれを Studio にインストールすると、ライセンス契約が表示されます。
+
+Maven は構築プロセス中に、`pom.xml` ファイルと同じディレクトリで `LICENSE.md` ファイルを検索します。
+
+このファイルが見つからない場合、Maven は次のステップを実行してライセンス契約を探します。
+
+. Maven が `pom.xml` ファイルと同じディレクトリで `LICENSE.txt` ファイルの有無を確認します。
+. `pom.xml` ファイルに *[Licenses (ライセンス)]* セクション (http://maven.apache.org/pom.html#Licenses[Maven のドキュメント]を参照) が含まれている場合、DevKit はライセンスの URL からテキストのダウンロードを試みて、ダウンロードしたコンテンツを新しい `LICENSE.md` ファイルとして保存します。
+. 上記のステップでライセンステキストが見つからない場合、構築に失敗します。
+
+グローバルライセンスファイルに加えて、DevKit ではソースファイルにライセンスヘッダーが含まれていることも必要です。ライセンスヘッダーをプロジェクトのすべてのソースファイルに適用するには、コネクタプロジェクトの `pom.xml` ファイルが含まれるプロジェクトのルートのコマンドコンソールで次のコマンドを実行します。
+
+----
+mvn license:format
+----
+
+このコマンドにより、プロジェクト全体が実行され、`LICENSE_HEADER.txt` ファイルで定義されたライセンスヘッダーが各ソースファイルに適用されます。これには、Java ファイル、SQL スクリプト、XML ファイルなどが含まれます。
+
+== ローカル Maven リポジトリへのコネクタのインストール
+
+次のコマンドを実行して、更新されたライセンス情報を使用してコネクタをローカル Maven リポジトリにインストールします。
+
+[IMPORTANT]
+`mvn license:format` はこの Maven インストールコマンドを実行する前に実行します。これは、Maven がインストール前にまずライセンスヘッダーを検証するためです。
+
+----
+mvn clean install
+----
+
+[NOTE]
+====
+冗長ログを有効にするには、次のコマンドを使用します。
+
+`mvn clean install -Ddevkit.verbose.logging=true`
+====
+
+== Maven を使用したコネクタのパッケージ化
+
+次の Maven コマンドを使用してコネクタをパッケージ化し、任意の場所にインストールする準備を整えることができます。これによって `.zip` ファイルに「更新サイト」が作成され、これを使用してコネクタを手動で Anypoint Studio にインストールできます。この更新サイトには、Mule アプリケーション内でコネクタを使用するために必要なすべて (パレットのアイコン、XSD、ソースファイルなど) が含まれています。そのため、パッケージ化する前にソースファイルにライセンスヘッダーがあることが重要です。
+
+*注意*: コネクタをパッケージ化しても、ソースファイルにライセンスヘッダーがあるかどうかは確認されません。コネクタをパッケージ化するには、ルートフォルダで次のコマンドを実行します。
+
+----
+mvn clean package
+----
+
+コネクタの `/target` フォルダでパッケージ化されたコネクタを見つけ、コネクタを Studio にインストールして使用できるようにします。
+
+
+== 省略可能 - コネクタの認定およびパブリッシュ
+
+MuleSoft のプログラムは、Anypoint Exchange を通じて配布するためにサードパーティのコネクタを認定し、パブリッシュします。このプログラムについての詳細は、xref:connector-certification-program-guidelines.adoc[コネクタ認定プログラムのガイドライン]に関するセクションに移動してください。
+
+
+== 省略可能 - Exchange へのコネクタのアップロード
+
+コネクタが MuleSoft によって認定された場合、コネクタを公開された Anypoint Exchange でパブリッシュし、Anypoint Studio にダウンロードするために Exchange からアクセスできるようにできます。コネクタをパブリッシュするには、xref:exchange::to-publish-assets-maven.adoc[「Maven を使用した Exchange アセットのパブリッシュとデプロイ」]で説明している Maven Facade を使用します。
+コネクタをパブリッシュするには、コネクタが Exchange で使用できる組織またはビジネスグループの組織 ID を取得する必要があります。
+
+////
+
+[NOTE]
+====
+In Anypoint Studio 6.0.1 and later, Feature ID is not a mandatory field. If not provided Studio is able to install the connector, however Exchange won’t be able to differentiate the status of the connector. Therefore, you will always see the *Install* button next to it in Exchange, even if you already have the latest version installed.
+
+Also, you don’t need to provide the full version number anymore. Following the example above, you can just provide 2.0.1 as the Connector Version and Studio makes a best effort to find an exact version based on this provided version.
+====
+
+From Exchange, click *Add Item* > *Connector* and fill out the form before entering the connector artifact details under *Versions*. Follow the steps below to complete the publishing process.
+
+. Unzip the file you have created locally containing your connector's Update Site.
+. In the extracted folder, look for the `content.xml` file and open it with a text editor.
+. In this file, search for a string that follows this pattern: `id=’org.mule.tooling.ui.extension.<connector name>.feature.group’`. That entire value is your connector’s *Feature ID*. As a more concrete example, your Feature ID could be something like `’org.mule.tooling.ui.extension.cloudhub.3.6.0.feature.group’`
+. Provide the version string, for example `version='1.0.0.201606211519'`, where it reads *Connector version*. Consumers of the connector only see the short version number. For example if the version number you provide is `2.0.1.201606101417`, they only see `2.0.1`. (The full version number displays ONLY when editing the entry in Exchange.)
+. Enter the minimum Mule runtime version required for your connector to work.
+. Provide the *Update Site URL* for your connector, and complete any other necessary fields for the connector's entry on Anypoint Exchange, such as a link to a documentation website.
+
+////
+
+== 省略可能 - モジュールの Studio カテゴリの変更
+
+拡張機能がコネクタの要件を十分に満たしていない場合、つまり、Anypoint Studio の異なるカテゴリに属する拡張機能と見なされる場合、`@Category` アノテーションをコネクタクラスに付加して、Studio で使用できるカテゴリのいずれかを指定します。独自のカテゴリを定義することはできません。
+
+次に、`xyz-Connector.java` ファイルにアノテーションを付加する方法を示します。
+
+[source,java,linenums]
+----
+@Connector(name = "myext", schemaVersion = "3.4", friendlyName="mine", minMuleVersion="3.5", description="An extension that allows you to extend xyz and perform every xyz operation")
+@Category(name = "org.mule.tooling.category.core", description = "Components")
+public class MyExtension
+{
+  ...
+
+----
+
+その他の使用可能なカテゴリは、次のいずれかを使用して定義する必要があります。
+
+[source,java,linenums]
+----
+import org.mule.api.annotations.Category;
+
+// Endpoint
+@Category(name = "org.mule.tooling.category.endpoints", description = "Endpoints")
+
+// Scope
+@Category(name = "org.mule.tooling.category.scopes", description = "Scopes")
+
+// Component
+@Category(name = "org.mule.tooling.category.core", description = "Components")
+
+// Transformer
+@Category(name = "org.mule.tooling.category.transformers", description = "Transformers")
+
+// Filters
+@Category(name = "org.mule.tooling.category.filters", description = "Filters")
+
+// Flow Control
+@Category(name = "org.mule.tooling.category.flowControl", description = "Flow Control")
+
+// Error Handling
+@Category(name = "org.mule.tooling.ui.modules.core.exceptions", description = "Error Handling")
+
+// Cloud Connectors
+@Category(name = "org.mule.tooling.category.cloudconnector", description = "Cloud Connectors")
+
+// Miscellaneous
+@Category(name = "org.mule.tooling.ui.modules.core.miscellaneous", description = "Miscellaneous")
+
+// Security
+@Category(name = "org.mule.tooling.category.security", description = "Security")
+----
+
+
+== 関連情報
+
+* https://www.anypoint.mulesoft.com/exchange/[Anypoint Exchange]

@@ -1,0 +1,88 @@
+= コネクタテストフレームワーク
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: コネクタテストフレームワーク, ctf, devkit, Mule, esb, ランタイム
+
+== 概要
+
+コネクタテストフレームワーク (CTF) の目的は、できるだけ多くのデプロイメントシナリオで機能テストを実行することです。このフレームワークでは、コネクタの開発基盤であった DevKit と Mule Runtime には紐付けられずに、Mule アプリケーションが「外部的」に実行されます。
+
+コネクタのルートフォルダから簡単な Maven コマンドを使用して、​*ローカルプロファイル*​に指定されたランタイム、​*埋め込みランタイム*​、または​*使用可能な CloudHub ランタイム*​のバージョンでコネクタのテストを実行できます。
+
+[NOTE]
+CloudHub でライブラリを変更すると、Mule Runtime バージョンと DevKit ベースのコネクタ間で​*不一致*​が発生する可能性が高まります。
+
+== デプロイメントプロファイルの設定
+
+目的のコネクタアプリケーションデプロイメントの詳細を 1 つの Maven コマンドに引数として渡し、コネクタをテストする環境を指定します。すべての引数を小文字にする必要があります。
+
+`-Ddeploymentprofile` を指定しない場合、CTF はデフォルトで埋め込みモードで実行されます。
+
+=== 埋め込みモード
+
+DevKit バージョンによっては、`mvn clean test` のみを指定すると、機能テストが _埋め込み_ モードで実行されます。Mule サーバにこのモードでアプリケーションを実行させる必要はありません。
+
+`mvn clean test ` を実行することは、次のコマンドを実行することと同じです。
+
+----
+mvn clean test -Ddeploymentprofile=embedded
+----
+
+=== ローカルモード
+
+CTF をローカルモードで実行すると、Mule アプリケーションのデプロイメント仕様がユーザプロファイルから読み込まれ、テストがリモートで実行されます。ローカルプロファイルのランタイムを使用してコネクタをテストするには、引数 `-Ddeploymentprofile` を `/local` フォルダ内に設定する​*必要があります*。たとえば、コマンドを次のように構成します。
+//todo: anywhere in /local, or does it have to be /local/usr/?
+
+----
+mvn clean test -Ddeploymentprofile= -Dmuledirectory=/local/usr/mule_3.6.3
+----
+
+
+=== CloudHub モード
+
+DevKit 3.9.0 以降、CloudHub デプロイメントプロファイルの CTF サポートが利用可能になり、コネクタをより動的な環境でテストできるようになりました。これは、従来のスタンドアロン環境に Mule アプリケーションをデプロイする上で明確な利点になります。`-Ddeploymentprofile=cloudhub` を指定する以外に、CloudHub ユーザ名 `-Dcloudhubuser=` と `-Dcloudhubpassword=` の 2 つの必須パラメータがあります。
+
+----
+mvn clean test -Ddeploymentprofile=cloudhub -Dcloudhubuser=<your_username> -Dcloudhubpassword=<your_password>
+----
+
+== 省略可能なパラメータ
+
+CloudHub でテストを行う場合、コネクタテストを実行する Mule バージョンのほか、インスタンスの CloudHub URL と CloudHub ワーカー種別を指定できます。すべての必須パラメータ _および_ 省略可能なパラメータについては、以下の例を参照してください。
+
+
+[%header%autowidth.spread]
+|===
+|省略可能なパラメータ|説明
+|`muleversion`| CloudHub で使用する Mule Runtime を設定します
+|`cloudhuburl`| CloudHub インスタンスを変更する機能を提供します。デフォルトでは、CTF は http://anypoint.mulesoft.com/cloudhub/ にデプロイされます
+|`cloudhubworkertype` | Mule アプリケーションを生成するための目的の vCores 数を設定できます。使用可能なオプションは、`micro` (0.1 vCore)、`small` (0.2 vCore)、`medium` (1 vCore)、`large` (2 vCore)、`xlarge` (4 vCore) です
+//todo: check each argument is printed above correctly
+|`cloudhubtimeout`| Mule アプリケーションがデプロイされている CloudHub インスタンスのタイムアウトを設定できます
+//todo:check above descrip for accuracy
+|===
+
+CTF テストコマンドの例:
+----
+mvn clean test -Ddeploymentprofile=cloudhub -Dcloudhubuser=<your_username> -Dcloudhubpassword=<your_password>
+-Dmuleversion=3.7.2
+-DcloudhubURL=http://qa.anypointplatform.mulesoft.com/cloudhub
+-Dcloudhubworkertype=small
+----
+
+////
+//== Troubleshooting
+
+
+what to do if your test failed
+debug logging to show more info.
+
+
+== Logging
+
+//When connector has a business logic exception
+//TODO: Describe logs in Mule and how to access logs in CloudHub
+////
+== 関連情報
+Runtime Manager の使用方法についての詳細は、xref:runtime-manager::deploying-to-cloudhub.adoc[「CloudHub へのデプロイ」]、xref:runtime-manager::deploying-to-your-own-servers.adoc[「独自のサーバへのデプロイ」]、xref:runtime-manager::managing-servers.adoc[クラウドおよびオンプレミスでのアプリケーションとサーバの管理]を参照してください。

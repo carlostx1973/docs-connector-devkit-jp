@@ -1,0 +1,127 @@
+= Anypoint コネクタプロジェクトの作成
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, create, コネクタ, プロジェクト
+
+* xref:creating-a-java-sdk-based-connector.adoc[Java SDK ベースのコネクタの作成]
+* xref:creating-a-soap-connector.adoc[SOAP コネクタの作成]
+
+== 前提条件
+
+DevKit ドキュメントの前提条件を次に示します。
+
+. Mule、Anypoint Studio、Java 開発全般の実践的な知識がある。
+. https://www.mulesoft.com/exchange[既存のコネクタ]の調査が完了している。
+. 対象システムやソースシステムの Sandbox 環境、および公開される Web サービスのドキュメントにアクセスできる。
+. Java 言語 (特に Java アノテーションの使用) の一般的な理解がある。DevKit の機能は、コードをコネクタクラスに挿入する Java アノテーションを介してコネクタ開発者に公開されます。挿入されたコードは、コネクタと Mule 間のインターフェースとして機能します。これがない場合、各コネクタ開発者は広範な定型コードを含める必要があります。このドキュメントでは、各例に照らしてそれぞれの DevKit 固有のアノテーションについて説明します。アノテーションに詳しくない場合は、&#8203;http://en.wikipedia.org/wiki/Java_annotation[「Java annotations (Java アノテーション)」]の簡単な説明を参照してください。
+
+*重要:* コネクタプロジェクトを構築するには、まず xref:setting-up-your-dev-environment.adoc[Anypoint コネクタ DevKit プラグイン]を Anypoint Studio にインストールする必要があります。
+
+== コネクタ構造の表示
+
+Anypoint コネクタ DevKit モジュールには、選択したプロジェクト内の全コネクタの DevKit クラス、プロパティ、メソッド、プロセッサ、設定可能な項目をすべて表示する Eclipse パースペクティブが含まれます。
+
+DevKit ビューを設定する手順は、次のとおりです。
+
+. 画面の右上の *[Add View (ビューを追加)]* アイコンをクリックし、*[Other (その他)]* をクリックします。
++
+image::viewbutton.png[ViewButton]
++
+. *[Devkit]* および *[OK]* をクリックし、[DevKit Perspective (DevKit パースペクティブ)] を開きます。
++
+image::devkitview.png[DevKitView]
++
+. *[Devkit]* パースペクティブの任意の項目をクリックし、それを定義するコードを表示します。次に例を示します。
++
+image::devkitperspective.png[DevKitPerspective]
+
+DevKit ビューでは、次の作業を行うことができます。
+
+* [Configurable (設定可能)] 項目またはメソッドをダブルクリックして、それが定義されているコードの行に簡単に移動する。
+* XML で操作が公開されるときに使用される名前を確認する。
+* XSD 名をダブルクリックして、サンプルドキュメントファイルのサンプルを表示する。
+* 絞り込んでコネクタの要素を見つける。
+
+== オートコンプリートの使用
+
+コネクタのメイン Java ファイルを編集する場合、オートコンプリート機能により、追加できるいくつかの一般的なメソッドの骨格構造が提供されます。これらの構造は、プロジェクトが構築テストに正常に合格し、コネクタのユーザがコネクタに関する参考資料にアクセスできるようにするために入力する必要がある基本的な https://en.wikipedia.org/wiki/Javadoc[Javadoc] ドキュメントに備わっています。
+
+@Connector クラスまたは他の @ アノテーションにカーソルを置いた状態で、CTRL + スペースバーを押すと、推奨エントリのリストが表示されます。
+
+image::connectorhelpinfo.png[ConnectorHelpInfo]
+
+@Connector と他の Anypoint コネクタ DevKit アノテーションについての詳細は、&#8203;http://mulesoft.github.io/mule-devkit/[「Anypoint DevKit API リファレンス」]を参照してください。
+
+=== コードテンプレートの使用
+
+テンプレートは、コネクタに追加できるコードのカスタマイズ可能な場所で、一般的に使用される要素の基本構造を提供します。名前またはその一部を入力し、`[ Command | Ctrl ] + space` を押してテンプレートを現在のコネクタクラスに挿入します。
+
+image::screen23.png[]
+
+=== 使用可能な DevKit テンプレート
+
+[%autowidth.spread]
+|===
+|`configurable` |設定可能な項目を追加します。
+|`datasense` |DataSense 操作を追加します。
+|`processor` |プロセッサをコネクタに追加します。各種テンプレートで複数のオプションがあります。
+|`transformer` |トランスフォーマメソッドを追加します。トランスフォーマは、ある入力を別の入力に変換します。
+|`restconfig` |設定可能な要素 (URI パラメータ、クエリパラメータ、ヘッダーパラメータなど) を REST ベースのコネクタに追加します。
+|`restprocessor` |*@RestCall プロセッサは、3.9.0 から非推奨になっています。*​REST ベースコネクタは、Anypoint コネクタプロジェクトの作成時に @RestCall パラメータを挿入します。
+|===
+
+== Anypoint Studio でコネクタのインストールおよび更新
+
+コネクタをコーディングしたら、Anypoint Studio でインストールして試すことができます。インストールしたら、Mule プロジェクトでコネクタを使用して、意図したとおりに機能することを確認できます。
+
+. Anypoint Studio の Package Explorer で、プロジェクトのルートを右クリックします。
+. *[Anypoint Connector (Anypoint コネクタ)]* > *[Install or Update (インストールまたは更新)]* を選択します。
++
+image::connector-install-update.png[]
++
+. *[Check the items you wish to install (インストールする項目を確認)]* で、*[Next (次へ)]* をクリックします。
+. *[Review the items to be installed (インストールされる項目を確認)]* で、*[Next (次へ)]* をクリックします。
+. [Review Licenses (ライセンスを確認)] で、*[I accept the terms of the license agreement (私はライセンス契約の条件に同意します)]* をクリックして *[Finish (完了)]* をクリックします。
+. Anypoint Studio を再起動します。
+
+=== コネクタを試す
+
+コネクタを試す手順は、次のとおりです。
+
+.  *[New (新規)]* > *[Mule Project (Mule プロジェクト)]* をクリックして新しいプロジェクトを作成します。
+. *[HTTP connector (HTTP コネクタ)]* をキャンバスに追加します。
+. 名前でコネクタを検索して、フローに追加します。
++
+次に例を示します。
++
+image::connector-display.png[]
+
+== 既存のコネクタプロジェクトのインポート
+
+既存のコネクタプロジェクトをインポートするには、*[File (ファイル)]* > *[Import (インポート)]* > *[Anypoint Studio]* > *[Anypoint Connector Project from External Location (既存の場所の Anypoint コネクタプロジェクト)]* をクリックして URL または .zip ファイルを選択し、ウィザードを完了してプロジェクトを見つけてインポートします。
+
+image::import.jpg[]
+
+
+== プロジェクトの圧縮ファイルのエクスポート
+
+プロジェクトの圧縮ファイルを作成する手順は、次のとおりです。
+
+. Anypoint Studio の Package Explorer で、プロジェクト名を右クリックし、*[Export (エクスポート)]* をクリックします。
+. *[General (一般)]* をクリックし、次の設定でファイルを​*アーカイブ*​します。TAR ファイル (Linux または Mac) と ZIP ファイル (Mac または Windows) のどちらが必要なのかを選択します。Windows ユーザは、7zip などのサードパーティソフトウェアを使用して TAR ファイルを展開することもできます。 +
+IMPORTANT: *target* フォルダをオフにします。
++
+image::archivefile.png[ArchiveFile]
+
+. プロジェクト名の横にある下矢印をクリックして、*target* をオフにします。 +
++
+image::archivedirs.png[ArchiveDirs]
+
+. *[To archive file (アーカイブするファイル)]* で *[Browse (参照)]* をクリックし、zip または tar ファイルの名前と場所を選択します。
+. *[Finish (完了)]* をクリックして、圧縮ファイルを作成します。
+
+== 関連情報
+
+* **次のステップ:** API のxref:authentication.adoc[認証方法の選択と実装]に進みます。
+* xref:connector-project-structure.adoc[コネクタプロジェクト構造]についての詳細を学習します。

@@ -1,0 +1,129 @@
+= MuleSoft 認定コネクタライセンス管理
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: コネクタ, devkit, ライセンス, キー, keygen, パートナー, 有料
+
+//todo: link to sample connectors and Mule app
+== はじめに
+
+*DevKit 3.9.0* では、MuleSoft 認定コネクタパートナー/開発者 (ここでは「パートナー」とも呼ばれる) は、パートナーの有料顧客のみがコネクタを使用可能にするため、コネクタがリリース用にパッケージ化される前に DevKit を使用してコネクタのライセンスをネイティブに管理できます。
+
+MuleSoft 認定コネクタを作成したパートナーは、独自のコネクタを含む Mule アプリケーションを作成し、Anypoint Studio にバンドルされている Mule ESB でテストする機会を見込み客に与えることができます。ただし、コネクタを含む Mule アプリケーションをデプロイするときに、パートナーからの有効なライセンスを所有していることを確認するため、顧客はパートナーが生成したキーを要求されます。
+
+== このライセンスメカニズムを使用する理由
+
+MuleSoft が生成したキーを使用すると、MuleSoft パートナーの有料顧客のみが有料バージョンのコネクタに完全にアクセスできます。コネクタを購入する前に試してみたいユーザは、Anypoint Studio での設計時にコネクタを試し、Studio の埋め込み Mule Runtime でアプリケーションを実行できます。
+
+== コネクタのキーとキーストアの取得
+
+開発したコネクタの認定を MuleSoft に申請する前に、認定コネクタパートナー候補は次の手順を実行する必要があります。
+
+. パートナーキーとキーストアを生成する前に MuleSoft が使用する次の情報を含めます。
+.. *会社名* (「プロバイダ名」とも呼ばれる)、*連絡先メール*、*連絡先メッセージ*、*コネクタ名*
+. MuleSoft に次のキーとキーストアを要求します。
+.. コネクタ内に保存する公開 `.key` ファイル。
+.. ライセンスを生成するパートナーとしての自分用の `.jks` マスタキーストア。
+
+== コネクタコードの調整と公開キーの保存
+
+キーとキーストアを取得したら、次の操作を実行します。
+
+. パートナーは、`@RequiresEntitlement` アノテーションを適用してすべての必須属性値を入力し、コネクタプロジェクトコードを調整します。
+.. `name` は、コネクタの名前である必要があります。
+.. `provider` 属性は、`.key` サフィックスの前の部分である必要があります。たとえば、MuleSoft がベンダーキー「prov-name.key」を生成した場合、パートナーはプロバイダとして「prov-name」を入力します。
++
+[source,java,linenums]
+----
+@RequiresEntitlement(name="connector-name", provider="prov-name")
+public class LicensedConnector {
+  ...
+----
++
+. MuleSoft が提供した `.key` ファイルをコネクタのプロジェクトディレクトリの `src/main/resources` または `src/main/resources/license` 内に置きます。
+
+=== サンプルパートナーコネクタ
+
+この link:{attachmentsdir}/licSampleConnector.zip[サンプルコネクタ]をダウンロードして Studio にインポートし、ライセンス管理アノテーションがコネクタコードでどのように設定されているかを確認し、顧客の `.key` ライセンスファイルを保存すべきコネクタディレクトリ (`src/main/resources`) の場所を把握できます。
+
+== ライセンスファイルの生成
+
+MuleSoft パートナーは `.jks` ファイルおよびライセンス生成プラグインを使用して、コネクタの顧客に送信するライセンスを生成します。
+
+コマンドラインで、「vendor.keystore」を独自の jks ファイルへのパスに置き換えて、`.jks` ファイルがあるディレクトリでコマンドを実行します。
+
+----
+mvn org.mule.tools.devkit:mule-devkit-license:license -Dvendor.keystore=betaprovider-license-demo.jks
+----
+
+[NOTE]
+必要に応じて、上記コマンドに `-Ddays.to.expire=<days-until-this-license-expires>` を追加することで、ライセンスの有効期限を指定できます。顧客の名前をライセンスに追加するには、`-Dclient=<client-name>` を追加します。
+
+ライセンスが正常に作成された場合、出力は次のようになります。
+
+----
+[INFO] Scanning for projects...
+[NOTE]
+[INFO] ------------------------------------------------------------------------
+[INFO] Building Maven Stub Project (No POM) 1
+[INFO] ------------------------------------------------------------------------
+[NOTE]
+[INFO] --- mule-devkit-license:license (default-cli) @ standalone-pom ---
+* Enter the name of the client whom will receive this license: Bob
+* Enter the name of the provider of the Entitlement as it appears in the @RequiresEntitlement annotation: betaprovider
+* Enter the name of the Entitlement as it appears in the @RequiresEntitlement annotation: lic-demo
+* Enter the name of the Connector as it appears in the @Connector "name" attribute: license-demo
+* Enter keystore password:
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 18.151s
+[INFO] Finished at: Thu Dec 10 09:34:41 ART 2015
+[INFO] Final Memory: 6M/287M
+[NOTE]
+----
+
+== ライセンス付きコネクタを含む Mule アプリケーションの開発
+
+顧客が有効なコネクタライセンスを検証するには、それに応じて Mule アプリケーションまたは Mule サーバを使用してライセンス (`.lic` ファイル) を使用可能にする必要があります。
+
+=== Mule アプリケーション内のライセンスファイル
+
+顧客がコネクタのライセンスを購入したら、パートナー/ベンダーによって顧客に提供された `.lic` ファイルは次のいずれかの場所に置かれます。
+
+* (Studio で開発された) アプリケーションの `src/main/resources` 内。
+* アプリケーションがすでに展開されてサーバにデプロイされている場合、`app/classes` 内。
+
+=== Mule サーバ内のライセンスファイル
+
+ライセンスをアプリケーションに保存する代わりに、Mule サーバの `conf/` フォルダに置くことができます。
+
+[NOTE]
+複数のアプリケーションが同じライセンスを必要とする場合は、Mule サーバにライセンスを保存することをお勧めします。
+
+== ライセンス付きコネクタを含むアプリケーションのデプロイ
+
+1) ライセンスを適切に取得して保存したかどうか、および 2) アプリケーションをデプロイする場所に基づき、パートナーコネクタを使用してアプリケーション開発者の環境をテストするには、次の手順に従います。
+
+. 圧縮されたlink:{attachmentsdir}/licSampleConnector.zip[サンプルコネクタプロジェクト]をダウンロードします。
+. *[File (ファイル)]* メニューから、*[Import (インポート)]* を選択して .zip ファイルをワークスペースにインポートします。
+. *[Project (プロジェクト)]* メニューから、*[Clean (クリーン)]* をクリックしてコネクタを作成します。
+. Package Explorer でコネクタプロジェクトを右クリックし、*[Install or Update (インストールまたは更新)]* をクリックしてコネクタを Studio にインストールします。
+. link:{attachmentsdir}/noLicenseSampleApp.zip[ライセンスのないコネクタを含むサンプルアプリケーション]またはlink:{attachmentsdir}/okLicenseSampleApp.zip[ライセンス付きコネクタを含むサンプルアプリケーション]を​*インポート*​します。
+
+[NOTE]
+Studio の​*アプリケーション設計*​では、必要なコネクタライセンスのないアプリケーションを実行しても、エラーや例外は発生しません。
+
+このサンプル Mule アプリケーションを有効なコネクタライセンスなしで *Mule ESB オンプレミス*​にデプロイしようとすると、例外が発生し、次のようなログが記録されます。
+
+----
+Exception…
+Caused by: org.mule.devkit.3.9.0.internal.lic.exception.InvalidLicenseException: License with name [license-demo.lic] not found as resource. License was not provided or its name is not the expected
+----
+
+ライセンスのないコネクタを使用する Mule アプリケーションを *CloudHub* にデプロイしようとすると、失敗して次の状況インジケータが表示されます。
+
+image::cloudhub-lic-status.png[cloudhubライセンス状況]
+
+== 関連情報
+* xref:packaging-your-connector-for-release.adoc[「リリースするコネクタのパッケージ化」]のセクションの確認

@@ -1,0 +1,217 @@
+= OAuth V1
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, oauth v1, api, 認証
+
+このページでは、DevKit による OAuth V1 認証のサポートについて詳しく説明し、API に対する認証に OAuth V1 を使用するコネクタを実装する方法について説明します。
+
+== 前提条件
+
+このドキュメントは、読者が xref:index.adoc[Anypoint コネクタ DevKit] に精通していて、コネクタに認証を実装する準備が整っていることを前提としています。読者がさまざまなxref:authentication-methods.adoc[認証方法]に精通していて、API に対する認証に OAuth V1 を使用していることを前提としています。
+
+OAuth V1 認証の概要や仕組みに精通していない場合、&#8203;http://oauth.net/core/1.0/[OAuth Core 1.0 ドキュメント]を参照することをお勧めします。
+
+=== 必要な API 情報
+
+サービスプロバイダの API ドキュメントから、以下の表で示している変数の値を取得します。これらの変数は、認証プロセス中に使用する URL を参照します。このプロセスのステップについての詳細は、&#8203;http://oauth.net/core/1.0a/[OAuth 1.0a specification 「(OAuth 1.0a 仕様)」]の&#8203;http://oauth.net/core/1.0a/#anchor9[「Authenticating With OAuth (OAuth を使用した認証)」]セクションを参照してください。
+
+[%header%autowidth.spread]
+|===
+|変数 |説明
+|`requestTokenUrl` |要求トークンを取得するための URL
+|`accessTokenUrl` |アクセストークンを取得するための URL
+|`authorizationUrl` |リソースアクセスへの認証を取得するための URL
+|===
+
+API へのアクセス権を調整する必要もあります。このプロセスは各 API プロバイダに固有ですが、このプロセスの一般的なステップについてはxref:setting-up-api-access.adoc[「API アクセスのセットアップ」]で説明しています。
+
+== @OAuth アノテーション
+
+コネクタで OAuth V1 認証を実装するには、`@Connector` クラスで `@OAuth` アノテーションを使用する必要があります。
+
+[NOTE]
+構築プロセス中に、@OAuth アノテーションが付加されたコネクタは `authorize` および `unauthorize` という名前の自動生成された 2 つの @Processor メソッドを取得します。これらのメッセージプロセッサは、OAuth セッションの開始と終了を行います。
+
+次の表で、`@OAuth` アノテーションのパラメータについて説明します。
+
+[%header,cols="4*a"]
+|===
+|パラメータ
+|説明
+|必須かどうか
+|デフォルト値
+
+|`messageSigner` |OAuth 1.0a フローで使用する署名メソッド。このメソッドは `auth_signature_method` パラメータに含まれます。 |  |`HMAC_SHA1`
+|`signingStrategy` |OAuth 1.0a パラメータが含まれる場所を定義します。 |  |`AUTHORIZATION_HEADER`
+|`requestTokenUrl` |未認証の要求トークンを取得するためにサービスプロバイダによって定義される URL。 |✓ |
+|`accessTokenUrl` |アクセストークンを取得するためにサービスプロバイダによって定義される URL。 |✓ |
+|`authorizationUrl` |サービスプロバイダによって定義される URL。リソース所有者はコンシューマに認証を許可するためにこの URL にリダイレクトされます。 |✓ |
+|`verifierRegex` |リソース所有者がコンシューマを認証した後で、サービスプロバイダの応答からベリファイアを抽出するために使用される Java 正規表現。 |  |`oauth_verifier=([^&]+)`
+|`callbackPath` |サービスプロバイダが受け入れるのが既知のリダイレクト URL のみの場合、このパラメータを、リダイレクト URL としてサービスプロバイダに登録されたドメイン (`fullDomain` 環境変数で示される) に割り当てます。空のままにした場合 (つまり、サービスプロバイダがリダイレクト URL として任意の URL を受け入れる場合)、Mule はランダムなパスを使用します。 |  |`<random path>`
+|===
+
+=== Maven プロジェクトの連動関係
+
+DevKit を使用して OAuth 1.0 に対する認証を実装する場合、次の連動関係を Maven `pom.xml` ファイルに追加する必要があります。
+
+[source,xml,linenums]
+----
+<dependency>
+   <groupId>oauth.signpost</groupId>
+   <artifactId>signpost-core</artifactId>
+   <version>1.2.1.1</version>
+</dependency>
+----
+
+=== @Connector クラスでの @OAuth アノテーションの追加
+
+NOTE: OAuth V1 は他の認証方法と異なり接続戦略として実装することはできず、`@Connector` クラスレベルでのアノテーションのみ使用できます。
+
+[source,java,linenums]
+----
+@Connector(name = "myconnector", friendlyName = "MyConnector")
+@OAuth(requestTokenUrl = "https://api.mycommector.com/uas/oauth/requestToken",
+accessTokenUrl = "https://api.mycommector.com/uas/oauth/accessToken",
+authorizationUrl = "https://api.mycommector.com/uas/oauth/authorize")
+public class MyConnector {
+    /**
+    * YOUR CODE GOES HERE
+    */
+}
+----
+
+
+=== @Connector クラスのプロパティ
+
+ユーザがコネクタを使用するときにコンシューマキーおよびシークレットを指定できるようにするには、`@Connector` クラスで OAuth に関連した `@Configurable` インスタンスプロパティが必要です。
+
+* OAuth コンシューマキーを保持するための `@OAuthConsumerKey`
+* OAuth コンシューマシークレットを保持するための `@OAuthConsumerSecret`
+
+[source,java,linenums]
+----
+@Configurable @OAuthConsumerKey private String consumerKey;
+@Configurable @OAuthConsumerSecret private String consumerSecret;
+----
+
+また、アクセストークンおよびアクセストークンシークレットを保持するための String (文字列) プロパティも必要であり、以下で示しているように public getter および setter (非表示) のアノテーションが付加されます。
+
+[source,java,linenums]
+----
+@OAuthAccessToken private String accessToken;
+@OAuthAccessTokenSecret private String accessTokenSecret;
+----
+
+=== @Processor メソッドのアノテーション
+
+`@Processor` メソッドを保護するために、次に示しているように @OAuthProtected アノテーションを付加します。
+
+[source,java,linenums]
+----
+@OAuthProtected
+@Processor
+    public void logInfo() {
+        logger.info(String.format("OAuthAccessToken=%s", getAccessToken()));
+        logger.info(String.format("OAuthAccessTokenSecret=%s", getAccessTokenSecret()));
+    }
+
+@OAuthProtected
+@Processor
+public void myOperation(String source, Object destination)
+{
+    /**
+    * CODE FOR MYOPERATION
+    */
+}
+----
+
+`@OAuthProtected @Processor` メソッドが呼び出されると、次のアクティビティを開始します。
+
+. 保護されたリソースに初めてアクセスするときに、ユーザは保護されたリソースへのコンシューマのアクセス権を許可または拒否するためにサービスプロバイダの認証 URL にリダイレクトされます。
+. 以降のアクセス要求中に、Mule は​*アクセストークン*​および​*アクセストークンシークレット* (`@OAuthAccessToken` および `@OAuthAccessTokenSecret` のアノテーションが付いたパラメータ内に含まれる) をサービスプロバイダへの要求に含めます。詳細は、&#8203;http://oauth.net/core/1.0/[「OAuth 1.0a specification (OAuth 1.0a 仕様)」]を参照してください。
+
+== クライアントクラスに OAuth ヘッダーを含める
+
+ほとんどの OAuth 1.0 実装では Jersey クライアントを使用して RESTful API にアクセスしますが、一部の実装ではアプリケーションに固有の Java クライアントライブラリを使用します。ただし、どのクライアントを使用する場合でも、要求と一緒にコンシューマキー、コンシューマシークレット、アクセストークン、アクセストークンシークレットを送信するには、クライアントクラスレベルでコードを追加します。
+
+Jersey クライアントのサンプルでは、この追加は次に示しているように、クライアントクラスのヘルパーメソッド `addSignHeader()` によって実行されます。
+
+[source,java,linenums]
+----
+private WebResource addSignHeader(WebResource webResource) {
+  OAuthParameters params = new OAuthParameters();
+  params.signatureMethod("PLAINTEXT");
+  params.consumerKey(getConnector().getConsumerKey());
+  params.setToken(getConnector().getAccessToken());
+
+  OAuthSecrets secrets = new OAuthSecrets();
+  secrets.consumerSecret(getConnector().getConsumerSecret());
+  secrets.setTokenSecret(getConnector().getAccessTokenSecret());
+  OAuthClientFilter filter = new OAuthClientFilter(client.getProviders(), params, secrets);
+
+  webResource.addFilter(filter);
+  return webResource;
+}
+----
+
+コネクタはこのメソッドを通じて Dropbox API にすべてのコールを渡し、OAuth V1 標準によって指定された認証ヘッダーを追加します。これは Jersey クライアントを使用する場合に限られるため、このメソッドの詳細な手順およびクライアントクラスへの適合についてはここでは説明しません。詳細については、xref:devkit-tutorial.adoc[Jersey を使用した RESTful API 用のコネクタの作成]についての説明を参照してください。
+
+== OAuth V1 コネクタの使用
+
+コネクタを構築してインストールしたら、以降のセクションで説明しているように、フローで使用できます。
+
+=== コネクタの認証
+
+リソース所有者が保護されたリソースへのアクセス権をコネクタに付与しないと、コンシューマは認証を必要とする操作を実行できません。認証要求を受信すると、Mule はリソース所有者のブラウザをサービスプロバイダの認証ページにリダイレクトします。それ以降、保護されたリソースにアクセスしようとすると、`@OAuthAccessToken` および `@OAuthAccessTokenSecret` のアノテーションが付加されたパラメータが入力されます。Mule はアクセストークンおよびトークンシークレットをサービスプロバイダへの要求に含めます。下の例では、&#8203;https://github.com/mulesoft/linkedin-connector[LinkedIn コネクタ]を使用しています。
+
+[source,xml,linenums]
+----
+<linkedin:config apiKey="${api.key}" apiSecret="${api.secret}"/>
+...
+  <flow name="authorize">
+      <http:inbound-endpoint host="localhost" port="8080" path="/authorize"/>
+      <linkedin:authorize/>
+  </flow>
+----
+
+=== フローでのコネクタの設定
+
+. サービスプロバイダから指定されたようにアプリケーションの​*コンシューマキー*​および​*コンシューマシークレット*​を渡して、拡張機能を設定します。下のコードサンプルは、こうした設定の例を示しています。
++
+[source,xml,linenums]
+----
+<linkedin:config apiKey="${api.key}" apiSecret="${api.secret}"/>
+...
+  <flow name="sampleFlow">
+      <linkedin:get-profile-for-current-user />
+  </flow>
+----
++
+. 保護されたリソースへのアクセスを試みるシンプルなフローを設定します。コネクタが OAuth によって認証されていない場合、コンシューマの操作で `NotAuthorizedException` がスローされます。
+
+=== コールバックのカスタマイズ
+
+ユーザが保護されたリソースへのアクセス権を付与した場合、サービスプロバイダは HTTP コールバックを行います。このコールバックでは、認証コードが渡されます。Mule は後でこれを使用してアクセストークンを取得します。コールバックを処理するために、Mule は動的に HTTP インバウンドエンドポイントを作成し、続いてエンドポイントの URL をサービスプロバイダに渡します。そのため、HTTP コールバックを行うために特定の設定を行う必要はありません。
+
+デフォルトでは、Mule はホストおよびポート (`fullDomain` 環境変数および `http.port` によって決定される) を使用してサービスプロバイダに送信する URL を構築します。ホストおよびポートにデフォルト以外の値を使用する必要がある場合は、下のコード例で示しているように、設定を追加します。 +
+
+[source,xml,linenums]
+----
+<linkedin:config apiKey="${api.key}" apiSecret="${api.secret}">
+<linkedin:oauth-callback-config domain="SOME_DOMAIN" remotePort="SOME_PORT"/>
+</linkedin:config>
+----
+
+Mule によるコールバックの処理についての詳細は、HTTP コールバックについての説明を参照してください。
+
+=== Secure Socket Layer (SSL) の追加
+
+Mule が OAuth コールバックを処理するために HTTP インバウンドエンドポイントを自動的に起動する場合、デフォルトでは HTTP コネクタを使用します。サービスプロバイダが *HTTPS* を必要とする場合、独自の HTTPS コネクタを渡すように Mule を設定できます。
+
+NOTE:
+*HTTPS コネクタ*​の設定についての詳細は、xref:3.7@mule-runtime::https-transport-reference.adoc[「HTTPS トランスポートリファレンス」]および xref:http-basic-authentication.adoc[HTTPS の例]を参照してください。
+
+== 関連情報
+
+xref:connector-attributes-and-operations.adoc[コネクタ機能の追加]

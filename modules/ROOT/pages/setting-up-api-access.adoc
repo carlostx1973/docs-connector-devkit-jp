@@ -1,0 +1,64 @@
+= API アクセスのセットアップ
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, api, アクセス権, コネクタ, クラウド, salesforce, twitter
+
+コネクタプロジェクトを開始する前に、接続先の API について調べます。対象のプロバイダが提供する API ドキュメントを収集して参照するだけでなく、テストできるようにインスタンスへのアクセス権を作成します。
+
+コネクタをローカルエンタープライズアプリケーションまたはその他の Web サービスに構築するために必要な Sandbox アクセス権、サポートするコードおよびドキュメント、その他のサポートは通常、ローカル管理者またはアプリケーションベンダーによって提供されます。SaaS アプリケーションには通常、API にアクセスするためのセルフサービスプロセスが用意されていて、これはサービスごとに異なります。
+
+このドキュメントでは、実行する必要があると考えられる一般的な準備ステップの概要を示し、2 つのケース、「<<Salesforce Example>>」と「<<Twitter Example>>」を取り上げます。
+
+
+== 前提条件
+
+このドキュメントでは、読者が API、Web サービス、またはその他のリソースに精通していて、対象の API のドキュメントまたはクライアントライブラリが公開されていることを前提としています。
+
+== クラウド API
+
+クラウド API は Software as a Service (SaaS) または Web サービスとも呼ばれ、アプリケーションプロバイダと協力してテスト/開発者アカウント、Sandbox 環境、API アクセス権限をセットアップする必要がある場合があります。一般的に、こうしたタスクを行うにはいくつかのステップを実行する必要があります。各ケースについての正しい手順については、API プロバイダのドキュメントを確認する必要があります。参考として、Salesforce と Twitter の 2 つの例を以下で示しています。
+
+[NOTE]
+以下の例は、このガイドの執筆時点では正しい情報ですが、API 所有者が後から手順を変更する可能性があることに留意してください。
+
+=== Salesforce の例
+
+. http://www.developerforce.com/events/regular/registration.php[Salesforce アカウントに登録します]。確認メールを受信するためにメールアドレスを指定する必要があります。
+. 登録フォームへの入力が完了したら、確認メールを開いて記載されたリンクをクリックし、パスワードを設定して Salesforce Developer Edition にログインできるようにします。
+. リモートアプリケーションで Salesforce にログインできるようにするには、次のステップを実行して Salesforce でセキュリティトークンをリセットする必要があります。
+.. Salesforce UI から、右上の  _[あなたの名前]_  > *[私の設定]* を選択します。
+.. 左サイドバーで *[私の個人情報]* を展開し、*[私のセキュリティトークンのリセット]* を選択します。
++
+image::reset-token.png[reset_token]
++
+.. *[セキュリティトークンのリセット]* ページで、*[セキュリティトークンのリセット]* ボタンをクリックします。Salesforce から新しいセキュリティトークンがメールで届きます。
+. *セキュリティトークン*、*ユーザ名*、*パスワード*​を記録します。これらの項目が下の例を実行するために必要になります。
+
+=== Twitter の例
+
+Twitter は、コネクタからアクセスする比較的シンプルな API の好例です。これは、多くの Web アプリケーションまたはサービスが類似モデルに従っているためです。
+
+. Twitter API にアクセスするには、最初に http://twitter.com/signup[Twitter アカウントを取得する]必要があります。
+. 作成したアカウントから Twitter API にアクセスするには、Twitter の&#8203;https://dev.twitter.com/docs[開発者ポータル]で空の Twitter アプリケーションを作成する必要があります。
+. Twitter コネクタをテストするには、Twitter から次の要素を取得します。
+** Access key (アクセスキー)
+** Access secret (アクセスシークレット)
+** Consumer key (コンシューマキー)
+** Consumer secret (コンシューマシークレット)
+. Twitter プラットフォームでのアプリケーションの作成に関する手順についての詳細は、xref:general:getting-started:anypoint-connector.adoc#obtaining-access-to-the-twitter-api[「Configure Twitter for API Access (API アクセス用の Twitter の設定)」]を参照してください。
+
+== SOAP ベースの API
+
+SOAP ベースの API では、API プロバイダから WSDL ファイルを取得する必要があります。さらに、SOAP ベースのサービスでは永続的なセッション、各メッセージに含まれたセキュリティヘッダー、セキュリティトークンなど、認証スキームが異なっている場合があります。コネクタを実装するときに、こうしたそれぞれのスキームに個別に注意する必要があります。
+
+== Java ライブラリの使用
+
+使用が可能な場合、サービスにアクセスするために既存の Java ライブラリをダウンロードできます。これは、アプリケーションにアクセスするための唯一の手段であるクライアントライブラリの場合もあれば、アプリケーションの公開された Web サービスのラッパーである場合もあります。ライブラリを使用するには、プロジェクトに Maven 連動関係として含めます。
+
+[NOTE]
+Maven を使用したアプリケーションの構築についての詳細は、公式 Maven ドキュメントの&#8203;http://maven.apache.org/guides/introduction/introduction-to-the-lifecycle.html[「Introduction to the Maven Build Cycle (Maven 構築サイクルの概要)」]を参照してください。
+
+== 関連情報
+
+*次へ:* xref:creating-an-anypoint-connector-project.adoc[「Anypoint コネクタプロジェクトの作成」]に進み、コネクタの開発を開始します。

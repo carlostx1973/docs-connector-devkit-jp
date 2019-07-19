@@ -1,0 +1,14 @@
+= Anypoint コネクタの例
+ifndef::env-site,env-github[]
+include::_attributes.adoc[]
+endif::[]
+:keywords: devkit, 例
+
+Anypoint コネクタ DevKit ドキュメントで提供される一連のコネクタの例は、さまざまなユースケースでコネクタを作成するときに適用する幅広い概念と手法を示しています。このドキュメントは、使用可能なコネクタの例と、それぞれの例で示されるトピックを要約しています。
+
+*注意*: これらのサンプルを使用するには、「DevKit 開発環境のセットアップ」の手順に従って開発環境を作成してください。
+
+*例:*
+
+* xref:creating-a-connector-using-a-java-sdk.adoc[Java SDK を使用したコネクタの作成]
+* xref:creating-a-connector-for-a-soap-service-via-cxf-client.adoc[CXF クライアントを介した SOAP サービスのコネクタの作成]
